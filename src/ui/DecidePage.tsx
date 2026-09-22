@@ -320,6 +320,7 @@ function Console({ port }: { port: number }) {
  */
 const SIZE = 9;
 type Pos = { r: number; c: number };
+const DELTA = { up: { r: -1, c: 0 }, down: { r: 1, c: 0 }, left: { r: 0, c: -1 }, right: { r: 0, c: 1 } } as const;
 
 function Game({ port }: { port: number }) {
   const [me, setMe] = useState<Pos>({ r: 7, c: 1 });
@@ -332,11 +333,45 @@ function Game({ port }: { port: number }) {
 
   const free = (p: Pos) => p.r >= 0 && p.c >= 0 && p.r < SIZE && p.c < SIZE && !walls.has(`${p.r},${p.c}`);
 
-  const describe = (p: Pos, goal: Pos) => {
-    const dir = (dr: number, dc: number) => (free({ r: p.r + dr, c: p.c + dc }) ? "open" : "blocked");
-    const vertical = goal.r < p.r ? `${p.r - goal.r} rows up` : goal.r > p.r ? `${goal.r - p.r} rows down` : "on the same row";
-    const horizontal = goal.c < p.c ? `${p.c - goal.c} columns left` : goal.c > p.c ? `${goal.c - p.c} columns right` : "in the same column";
-    return `You are on a grid. The coin is ${vertical} and ${horizontal}. Up is ${dir(-1, 0)}, down is ${dir(1, 0)}, left is ${dir(0, -1)}, right is ${dir(0, 1)}.`;
+  /** Steps to the goal around the walls (breadth-first), or Infinity. */
+  const distance = (from: Pos, goal: Pos): number => {
+    const seen = new Set([`${from.r},${from.c}`]);
+    let frontier = [from];
+    for (let steps = 0; frontier.length; steps++) {
+      const next: Pos[] = [];
+      for (const p of frontier) {
+        if (p.r === goal.r && p.c === goal.c) return steps;
+        for (const d of Object.values(DELTA)) {
+          const q = { r: p.r + d.r, c: p.c + d.c };
+          const k = `${q.r},${q.c}`;
+          if (free(q) && !seen.has(k)) {
+            seen.add(k);
+            next.push(q);
+          }
+        }
+      }
+      frontier = next;
+    }
+    return Infinity;
+  };
+
+  /**
+   * The way decision models are meant to be fed: only the moves that are
+   * possible, each with what it leads to. The model weighs consequences; it
+   * does not have to do geometry in its head, which a 2B model does badly.
+   */
+  const choices = (p: Pos, goal: Pos, recent: string[]) => {
+    const now = distance(p, goal);
+    return (Object.keys(DELTA) as Array<keyof typeof DELTA>)
+      .map((dir) => {
+        const q = { r: p.r + DELTA[dir].r, c: p.c + DELTA[dir].c };
+        if (!free(q)) return null;
+        const after = distance(q, goal);
+        const effect = after < now ? "closer to the coin" : after > now ? "farther from the coin" : "no closer";
+        const revisit = recent.includes(`${q.r},${q.c}`) ? ", back to a square you just left" : "";
+        return { dir, pos: q, label: `move ${dir}: ${after} steps from the coin, ${effect}${revisit}` };
+      })
+      .filter((c): c is { dir: keyof typeof DELTA; pos: Pos; label: string } => c !== null);
   };
 
   const play = async () => {
@@ -347,28 +382,34 @@ function Game({ port }: { port: number }) {
     let totalMs = 0;
     let moves = 0;
     let coins = stats.coins;
-    while (!stop.current && moves < 200) {
+    let lastMove: string | null = null;
+    const recent: string[] = [];
+    while (!stop.current && moves < 300) {
+      const options = choices(pos, goal, recent);
+      if (!options.length) break;
       const d = await decide(port, {
-        state: describe(pos, goal),
-        question: "Which move brings you closer to the coin without walking into a wall?",
-        options: ["up", "down", "left", "right"],
+        state: `You are playing a grid game and want to reach the coin in as few moves as possible. You are ${distance(pos, goal)} steps from it.${lastMove ? ` Your last move was ${lastMove}.` : ""}`,
+        question: "Which move should you make?",
+        options: options.map((o) => o.label),
       });
-      const delta: Record<string, Pos> = { up: { r: -1, c: 0 }, down: { r: 1, c: 0 }, left: { r: 0, c: -1 }, right: { r: 0, c: 1 } };
-      // The most likely move that is actually possible.
-      const ranked = [...d.options].sort((a, b) => b.p - a.p);
-      const move = ranked.find((o) => free({ r: pos.r + delta[o.label].r, c: pos.c + delta[o.label].c }));
-      if (move) pos = { r: pos.r + delta[move.label].r, c: pos.c + delta[move.label].c };
+      const best = options[d.options.findIndex((o) => o.label === d.best)] ?? options[0];
+      recent.push(`${pos.r},${pos.c}`);
+      if (recent.length > 6) recent.shift();
+      pos = best.pos;
+      lastMove = best.dir;
       moves += 1;
       totalMs += d.ms;
       if (pos.r === goal.r && pos.c === goal.c) {
         coins += 1;
+        recent.length = 0;
         do {
           goal = { r: Math.floor(Math.random() * SIZE), c: Math.floor(Math.random() * SIZE) };
         } while (!free(goal) || (goal.r === pos.r && goal.c === pos.c));
         setCoin(goal);
       }
       setMe(pos);
-      setLast(d);
+      // Bars show the direction; the full option text is what the model read.
+      setLast({ ...d, best: best.dir, options: d.options.map((o, i) => ({ ...o, label: options[i].dir })) });
       setStats({ moves, coins, ms: Math.round(totalMs / moves) });
     }
     setRunning(false);
