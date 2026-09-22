@@ -9,3 +9,4 @@ coverage
 .claude/
 *.key
 src-tauri/installer/*.png
+brag-output*/

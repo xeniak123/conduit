@@ -160,11 +160,28 @@ export function runtimeFor(info: Machine): { asset: string; binary: string } | n
 }
 
 export async function resolveRuntimeUrl(asset: string): Promise<string> {
-  const res = await fetch("https://api.github.com/repos/ggml-org/whisper.cpp/releases?per_page=15", {
-    headers: { Accept: "application/vnd.github+json" },
-  });
-  if (!res.ok) throw new Error(`GitHub answered ${res.status} when asked for whisper.cpp releases.`);
-  const releases = (await res.json()) as Array<{
+  // Through the native proxy: the window itself may not open connections
+  // (its content policy allows only the app), so a plain fetch here failed
+  // with "Failed to fetch" and no model could ever be installed.
+  const url = "https://api.github.com/repos/ggml-org/whisper.cpp/releases?per_page=15";
+  const body = isTauri()
+    ? await invoke<{ status: number; body: string }>("proxy_send", {
+        request: {
+          url,
+          method: "GET",
+          headers: { accept: "application/vnd.github+json", "user-agent": "Conduit" },
+          body: null,
+          auth: null,
+        },
+      }).then((r) => {
+        if (r.status !== 200) throw new Error(`GitHub answered ${r.status} when asked for whisper.cpp releases.`);
+        return r.body;
+      })
+    : await fetch(url, { headers: { Accept: "application/vnd.github+json" } }).then((r) => {
+        if (!r.ok) throw new Error(`GitHub answered ${r.status} when asked for whisper.cpp releases.`);
+        return r.text();
+      });
+  const releases = JSON.parse(body) as Array<{
     draft: boolean;
     assets: Array<{ name: string; browser_download_url: string }>;
   }>;

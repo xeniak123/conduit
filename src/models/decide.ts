@@ -29,7 +29,9 @@ const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 /** Names and tags these models are published under. */
 export function isDecisionModel(text: string): boolean {
-  return /\bjev\b|jev[-_]|[-_]jev|decision[-_ ]?model|[-_]decision\b|system[-_ ]one|semantic[-_ ]if|typed[-_ ]decisions/i.test(text);
+  return /jev\b|jev[-_]|\blaya\b|\bdecider\b|\bkev-\d|\bvon\b|decision[-_ ]?model|[-_]decision\b|system[-_ ]?one|systemone|semantic[-_ ]if|typed[-_ ]decisions|calibrated[-_ ]decisions/i.test(
+    text,
+  );
 }
 
 export function decisionPrompt(state: string, question: string, options: string[]): string {

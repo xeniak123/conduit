@@ -44,3 +44,22 @@ describe("a real llama-server answer", () => {
     expect(d[2].p + d[3].p).toBeGreaterThan(0.95);
   });
 });
+
+describe("the wider decision-model family", () => {
+  it("recognises the ones published on the hub", () => {
+    for (const id of [
+      "convaiinnovations/laya",
+      "Mapika/decider-2b",
+      "C-Tianyu/NanoJev",
+      "jaredpalmer/kev-4b",
+      "iapp/OpenThai-SystemOne",
+      "com-kotobalabs/open-jev-deberta-v3-large",
+      "Weidows/laya-multilingual-GGUF",
+    ]) {
+      expect(isDecisionModel(id), id).toBe(true);
+    }
+    for (const id of ["unsloth/Qwen3-8B-GGUF", "google/gemma-4-12b", "meta-llama/Llama-4-Scout"]) {
+      expect(isDecisionModel(id), id).toBe(false);
+    }
+  });
+});

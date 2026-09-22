@@ -213,21 +213,26 @@ function Discover({ hw }: { hw: Hardware | null }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const debounce = useRef<number | null>(null);
+  const search = useRef(0);
 
   useEffect(() => {
     if (debounce.current) window.clearTimeout(debounce.current);
     debounce.current = window.setTimeout(() => {
       const current = SHELVES.find((s) => s.id === shelf);
       const q = query.trim() || current?.query || "";
+      // Only the newest search may write. Without this, answers to older
+      // keystrokes arrive late and fight over the list.
+      const ticket = ++search.current;
       setBusy(true);
       setProblem(null);
-      searchModels(q, sort, query.trim() ? undefined : current?.author)
+      searchModels(q, sort, query.trim() ? undefined : current?.author, query.trim() ? undefined : current?.tag)
         .then((list) => {
+          if (ticket !== search.current) return;
           setResults(list);
           setSelected((prev) => (prev && list.some((m) => m.id === prev.id) ? prev : (list[0] ?? null)));
         })
-        .catch((e) => setProblem(e instanceof Error ? e.message : String(e)))
-        .finally(() => setBusy(false));
+        .catch((e) => ticket === search.current && setProblem(e instanceof Error ? e.message : String(e)))
+        .finally(() => ticket === search.current && setBusy(false));
     }, query ? 320 : 0);
     return () => {
       if (debounce.current) window.clearTimeout(debounce.current);
@@ -344,6 +349,8 @@ function ModelDetail({ model, hw }: { model: HubModel; hw: Hardware | null }) {
   const [card, setCard] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const hardwareRef = useRef(hw);
+  hardwareRef.current = hw;
   const downloads = useRuntime((s) => s.downloads);
   const library = useRuntime((s) => s.library);
 
@@ -357,17 +364,21 @@ function ModelDetail({ model, hw }: { model: HubModel; hw: Hardware | null }) {
         if (!live) return;
         const grouped = groupQuants(files);
         setQuants(grouped);
-        const pick = hw ? recommendQuant(grouped, hw) : grouped[0];
+        const pick = hardwareRef.current ? recommendQuant(grouped, hardwareRef.current) : grouped[0];
         setChoice(pick?.name ?? null);
       })
       .catch((e) => live && setProblem(e instanceof Error ? e.message : String(e)));
+    // Model cards run to tens of thousands of characters; the first few
+    // thousand are the part worth reading, and the rest cost a freeze.
     readme(model.id)
-      .then((text) => live && setCard(text.slice(0, 24_000)))
+      .then((text) => live && setCard(text.slice(0, 6_000)))
       .catch(() => undefined);
     return () => {
       live = false;
     };
-  }, [model.id, hw]);
+    // Hardware arriving later must not refetch the whole card.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model.id]);
 
   const quant = quants?.find((q) => q.name === choice) ?? null;
   const recommended = quants && hw ? recommendQuant(quants, hw) : null;

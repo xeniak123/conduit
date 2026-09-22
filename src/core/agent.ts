@@ -96,6 +96,8 @@ export async function runAgent(
   // subsequent turn — being asked again on step 12 after saying yes on step 4
   // would train people to dismiss the prompt without reading it.
   let budgetWaived = false;
+  // One free retry when a model answers with nothing at all.
+  let nudged = false;
 
   const messages: Msg[] = [
     // Earlier turns of this chat, as plain text. Without them every message
@@ -177,7 +179,19 @@ export async function runAgent(
     }
 
     if (!response.calls.length) {
-      return { steps, answer: response.text.trim(), usage };
+      const said = response.text.trim();
+      if (said) return { steps, answer: said, usage };
+      // Some models (small or free ones especially) return an empty turn.
+      // One nudge, then a plain request for the answer, so a run never ends
+      // with a blank reply.
+      if (!nudged) {
+        nudged = true;
+        messages.push({ role: "assistant", text: "" });
+        messages.push({ role: "user", text: "You replied with nothing. Answer the request now, in plain words." });
+        continue;
+      }
+      const forced = await finish(messages);
+      return { steps, answer: forced || "I could not produce an answer for that. Try rewording it, or pick another model.", usage };
     }
 
     messages.push({ role: "assistant", text: response.text, calls: response.calls });
@@ -210,11 +224,47 @@ export async function runAgent(
     }
   }
 
-  const bailout = signal?.aborted
-    ? "Stopped."
-    : "Stopped after too many steps without finishing. Try a narrower request.";
-  if (!signal?.aborted) emit({ kind: "error", text: bailout });
-  return { steps, answer: bailout, usage };
+  if (signal?.aborted) return { steps, answer: "Stopped.", usage };
+  // The step ceiling is not a dead end: whatever the run learned is worth an
+  // answer, with the limit stated honestly.
+  const summary = await finish(messages, true);
+  const capped = summary
+    ? `${summary}\n\n> I stopped after ${limit} steps. Ask me to continue if that was not the whole job.`
+    : "I ran out of steps before finishing. Try a narrower request.";
+  emit({ kind: "answer", text: capped });
+  return { steps, answer: capped, usage };
+
+  /** One last turn with no tools, so the run always ends in words. */
+  async function finish(history: Msg[], capped = false): Promise<string> {
+    try {
+      const result = await abortable(
+        provider.complete({
+          model: command.model,
+          system: systemPrompt(ctx, settings),
+          messages: [
+            ...pruneFrames(history),
+            {
+              role: "user",
+              text: capped
+                ? "You have reached the step limit. Tell the user what you did, what you found, and what is left, in a short answer. Do not call any tools."
+                : "Answer the request now in plain words, using what you already found. Do not call any tools.",
+            },
+          ],
+          maxTokens: 1024,
+          signal,
+        }),
+        signal,
+      );
+      if (result.usage) {
+        usage.input += result.usage.input;
+        usage.output += result.usage.output;
+        usage.cost += costOf(command.model, result.usage.input, result.usage.output) ?? 0;
+      }
+      return result.text.trim();
+    } catch {
+      return "";
+    }
+  }
 }
 
 async function executeCall(

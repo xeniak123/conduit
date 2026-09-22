@@ -4,16 +4,25 @@ import { motion } from "motion/react";
 import hljs from "highlight.js/lib/common";
 import { SPRING_SNAP } from "./motion";
 
-/** Colours a code block, falling back to plain escaped text for unknown languages. */
+/**
+ * Colours a code block when the language is named.
+ *
+ * Never guesses: highlight.js's auto-detection runs every grammar it knows
+ * over the text, and a Hugging Face model card with thirty unlabelled blocks
+ * froze the whole window for seconds. A named language is cheap; anything
+ * else stays plain text.
+ */
+const MAX_HIGHLIGHT = 12_000;
+
 function highlight(lang: string, body: string): string {
+  const plain = () => body.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
+  const language = lang.toLowerCase();
+  if (!language || body.length > MAX_HIGHLIGHT || !hljs.getLanguage(language)) return plain();
   try {
-    const language = lang.toLowerCase();
-    if (language && hljs.getLanguage(language)) return hljs.highlight(body, { language, ignoreIllegals: true }).value;
-    if (body.length < 20_000) return hljs.highlightAuto(body).value;
+    return hljs.highlight(body, { language, ignoreIllegals: true }).value;
   } catch {
-    /* fall through to plain text */
+    return plain();
   }
-  return body.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
 }
 
 export function Markdown({ text }: { text: string }) {

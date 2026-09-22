@@ -90,9 +90,16 @@ const SORT_KEY: Record<Sort, string> = {
 };
 
 /** GGUF repositories only: those are the ones that run here without a conversion step. */
-export async function searchModels(query: string, sort: Sort = "trending", author?: string): Promise<HubModel[]> {
+export async function searchModels(
+  query: string,
+  sort: Sort = "trending",
+  author?: string,
+  tag?: string,
+): Promise<HubModel[]> {
   const params = new URLSearchParams({
-    filter: "gguf",
+    // A tagged shelf drops the GGUF requirement: several decision models ship
+    // as safetensors only, and hiding them would hide the whole family.
+    filter: tag ? tag : "gguf",
     sort: SORT_KEY[sort],
     direction: "-1",
     limit: "40",
@@ -161,8 +168,10 @@ export function fileUrl(id: string, path: string): string {
 }
 
 /** Collections worth opening on first launch, before anybody has typed anything. */
-export const SHELVES: Array<{ id: string; label: string; author?: string; query?: string }> = [
+export const SHELVES: Array<{ id: string; label: string; author?: string; query?: string; tag?: string }> = [
   { id: "trending", label: "Trending" },
+  // The System One family: models that choose rather than write.
+  { id: "decision", label: "Decision models", tag: "decision-model" },
   { id: "unsloth", label: "Unsloth", author: "unsloth" },
   { id: "qwen", label: "Qwen", query: "qwen" },
   { id: "gemma", label: "Gemma", query: "gemma" },
