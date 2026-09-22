@@ -3,6 +3,7 @@ import { hideCursor } from "@/computer";
 import type { Msg } from "@/llm/types";
 import type { ToolContext } from "@/tools/registry";
 import { runAgent } from "./agent";
+import { route, saved, tiers } from "./router";
 import { getSettings, type Settings } from "./config";
 import { pulseCursorBirth } from "./companion";
 import { useApp } from "./store";
@@ -36,7 +37,11 @@ export async function sendMessage(
 
   const store = useApp.getState();
   const conversationId = opts.conversationId ?? store.activeId ?? store.newConversation();
-  const settings = opts.settings ?? getSettings();
+  const base = opts.settings ?? getSettings();
+  // Auto: the router picks a model for this message. Scheduled runs keep the
+  // model they were given.
+  const picked = !opts.settings && base.router?.enabled ? await route(trimmed, base, opts.images?.length ?? 0) : null;
+  const settings = picked ? { ...base, command: picked.model } : base;
   const declined: string[] = [];
   const history = historyOf(conversationId);
 
@@ -163,6 +168,14 @@ export async function sendMessage(
       pending: false,
       cost: run.usage.cost,
       tokens: run.usage.input + run.usage.output,
+      routed: picked
+        ? {
+            model: picked.model.model,
+            tier: picked.tier,
+            reason: picked.reason,
+            saved: picked.tier === "fast" ? saved(tiers(base).strong.model, picked.model.model, run.usage.input, run.usage.output) : null,
+          }
+        : undefined,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

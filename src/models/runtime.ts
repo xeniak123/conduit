@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { getSettings, saveSettings, type CustomProvider } from "@/core/config";
 import { isTauri } from "@/core/host";
 import { useApp } from "@/core/store";
+import { isDecisionModel } from "./decide";
 import { fileUrl, hfAuth } from "./hub";
 import type { Hardware, Quant } from "./quant";
 
@@ -53,6 +54,8 @@ export interface Loaded {
   context: number;
   gpuLayers: number;
   startedAt: number;
+  /** A decision model: answers with option probabilities, never with text. */
+  decision?: boolean;
 }
 
 export interface LoadOptions {
@@ -287,19 +290,21 @@ interface Release {
 /**
  * Which archive to fetch. Checked against the real release listing: builds are
  * tagged `bNNNNN`, published as pre-releases (so GitHub's "latest" endpoint
- * never returns them), zipped on Windows and tarred everywhere else.
+ * never returns them), zipped on Windows and tarred everywhere else. Each
+ * backend lists its preferred archive first; CUDA 12 before 13, because far
+ * more installed drivers support it.
  */
-const ASSET: Record<string, Partial<Record<Backend, RegExp>>> = {
+const ASSET: Record<string, Partial<Record<Backend, RegExp[]>>> = {
   windows: {
-    cuda: /-bin-win-cuda-12.4-x64.zip$/,
-    vulkan: /-bin-win-vulkan-x64.zip$/,
-    cpu: /-bin-win-cpu-x64.zip$/,
+    cuda: [/-bin-win-cuda-12\.\d+-x64\.zip$/, /-bin-win-cuda-\d+\.\d+-x64\.zip$/],
+    vulkan: [/-bin-win-vulkan-x64\.zip$/],
+    cpu: [/-bin-win-cpu-x64\.zip$/, /-bin-win-avx2-x64\.zip$/],
   },
-  macos: { metal: /-bin-macos-arm64.tar.gz$/, cpu: /-bin-macos-x64.tar.gz$/ },
+  macos: { metal: [/-bin-macos-arm64\.(tar\.gz|zip)$/], cpu: [/-bin-macos-x64\.(tar\.gz|zip)$/] },
   linux: {
-    cuda: /-bin-ubuntu-cuda-12.d+-x64.tar.gz$/,
-    vulkan: /-bin-ubuntu-vulkan-x64.tar.gz$/,
-    cpu: /-bin-ubuntu-x64.tar.gz$/,
+    cuda: [/-bin-ubuntu-cuda-12\.\d+-x64\.tar\.gz$/, /-bin-ubuntu-cuda-\d+\.\d+-x64\.tar\.gz$/],
+    vulkan: [/-bin-ubuntu-vulkan-x64\.(tar\.gz|zip)$/],
+    cpu: [/-bin-ubuntu-x64\.(tar\.gz|zip)$/],
   },
 };
 
@@ -310,31 +315,69 @@ export interface RuntimeChoice {
   size: number;
 }
 
+const RELEASE_CACHE = "conduit.llama-release.v1";
+
+/**
+ * The newest llama.cpp build that has server archives.
+ *
+ * GitHub allows sixty anonymous API calls an hour per address, which a shared
+ * network can exhaust. The last good answer is kept, so a rate limit or a
+ * flaky connection falls back to a build that is at most a little older
+ * instead of stopping anyone from running a model.
+ */
 async function latestBuild(): Promise<Release> {
-  const response = await invoke<{ status: number; body: string }>("proxy_send", {
-    request: {
-      url: "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=6",
-      method: "GET",
-      headers: { "user-agent": "Conduit", accept: "application/vnd.github+json" },
-      body: null,
-      auth: null,
-    },
-  });
-  if (response.status !== 200) throw new Error(`GitHub answered ${response.status}.`);
-  const releases = JSON.parse(response.body) as Release[];
-  const build = releases.find((r) => /^bd+$/.test(r.tag_name) && r.assets.length > 4);
-  if (!build) throw new Error("No llama.cpp build with downloads was found.");
-  return build;
+  let cached: Release | null = null;
+  try {
+    cached = JSON.parse(localStorage.getItem(RELEASE_CACHE) ?? "null") as Release | null;
+  } catch {
+    cached = null;
+  }
+  try {
+    const response = await invoke<{ status: number; body: string }>("proxy_send", {
+      request: {
+        url: "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=20",
+        method: "GET",
+        headers: { "user-agent": "Conduit", accept: "application/vnd.github+json" },
+        body: null,
+        auth: null,
+      },
+    });
+    if (response.status !== 200) {
+      throw new Error(
+        response.status === 403 || response.status === 429
+          ? "GitHub is rate-limiting this network. Try again in a few minutes."
+          : `GitHub answered ${response.status}.`,
+      );
+    }
+    const releases = JSON.parse(response.body) as Release[];
+    const build = releases.find(
+      (r) => /^b\d+$/.test(r.tag_name) && r.assets.some((a) => /-bin-/.test(a.name)),
+    );
+    if (!build) throw new Error("GitHub listed no llama.cpp build with downloads.");
+    try {
+      localStorage.setItem(RELEASE_CACHE, JSON.stringify({ tag_name: build.tag_name, assets: build.assets }));
+    } catch {
+      /* the cache is a convenience */
+    }
+    return build;
+  } catch (e) {
+    if (cached?.assets?.length) return cached;
+    throw e;
+  }
 }
 
-function archivesFor(release: Release, os: string, backend: Backend) {
-  const pattern = ASSET[os]?.[backend];
-  if (!pattern) return null;
-  const main = release.assets.find((a) => pattern.test(a.name));
+export function archivesFor(release: Release, os: string, backend: Backend) {
+  const patterns = ASSET[os]?.[backend];
+  if (!patterns) return null;
+  let main: Release["assets"][number] | undefined;
+  for (const pattern of patterns) {
+    main = release.assets.find((a) => pattern.test(a.name));
+    if (main) break;
+  }
   if (!main) return null;
   const list = [main];
   if (backend === "cuda") {
-    const version = /cuda-(d+.d+)/.exec(main.name)?.[1];
+    const version = /cuda-(\d+\.\d+)/.exec(main.name)?.[1];
     const cudart = release.assets.find(
       (a) => a.name.startsWith("cudart-") && version && a.name.includes(`cuda-${version}-x64`),
     );
@@ -496,8 +539,12 @@ export async function load(entry: LibraryEntry, options: LoadOptions): Promise<v
       context: options.context,
       gpuLayers: options.gpuLayers,
       startedAt: Date.now(),
+      decision: isDecisionModel(`${entry.repo} ${entry.name}`),
     },
   });
+  // A decision model would answer a chat with gibberish, so it is offered in
+  // the Decisions console and the API rather than in the model switcher.
+  if (useRuntime.getState().loaded?.decision) return;
   await registerProvider(entry.name);
 }
 

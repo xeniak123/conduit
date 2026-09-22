@@ -27,6 +27,9 @@ pub struct Route {
     pub upstream: String,
     /// Credential to attach, if any, as `Authorization: Bearer <key>`.
     pub account: Option<String>,
+    /// A decision model, served through /v1/decide.
+    #[serde(default)]
+    pub decision: bool,
 }
 
 #[derive(Deserialize, Clone)]
@@ -281,6 +284,17 @@ fn handle(app: AppHandle, config: &Config, mut request: tiny_http::Request) {
             let status = forward(request, &route, url, json.to_string(), stream, anthropic, passed);
             log(status, Some(route.id));
         }
+        ("POST", "/v1/decide") => {
+            let mut body = String::new();
+            if request.as_reader().read_to_string(&mut body).is_err() {
+                let _ = request.respond(error(400, "Could not read the request body."));
+                log(400, None);
+                return;
+            }
+            let (status, answer, model) = decide(config, &body);
+            let _ = request.respond(json_response(status, answer));
+            log(status, model);
+        }
         _ => {
             let _ = request.respond(error(404, "Not found. This server speaks /v1/models, /v1/chat/completions, /v1/messages and /v1/responses."));
             log(404, None);
@@ -430,3 +444,146 @@ pub fn lan_addresses() -> Vec<String> {
     out
 }
 
+
+const LETTERS: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+/// One decision from a decision model: a state, a question and options in,
+/// a probability per option out. Built here, next to the model, so a game
+/// loop pays for one local HTTP hop and nothing else.
+fn decide(config: &Config, body: &str) -> (u16, String, Option<String>) {
+    let fail = |status: u16, message: &str| (status, serde_json::json!({ "error": { "message": message } }).to_string(), None);
+    let Ok(input) = serde_json::from_str::<serde_json::Value>(body) else {
+        return fail(400, "The body is not valid JSON.");
+    };
+    let text = |k: &str| input.get(k).and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    let kind = text("kind");
+    let options: Vec<String> = if kind == "bool" {
+        vec!["yes".into(), "no".into()]
+    } else {
+        input
+            .get("options")
+            .and_then(|v| v.as_array())
+            .map(|a| a.iter().filter_map(|o| o.as_str().map(|s| s.trim().to_string())).filter(|s| !s.is_empty()).collect())
+            .unwrap_or_default()
+    };
+    if options.len() < 2 || options.len() > 26 {
+        return fail(400, "Send between 2 and 26 options.");
+    }
+    let asked = text("model");
+    let route = config
+        .routes
+        .iter()
+        .find(|r| !asked.is_empty() && (r.id == asked || r.upstream == asked))
+        .or_else(|| config.routes.iter().find(|r| r.decision));
+    let Some(route) = route else {
+        return fail(404, "No decision model is loaded. Load one in Conduit's Model hub.");
+    };
+
+    let mut prompt = String::from(
+        "You are a decision function. Read the state, then answer the question by choosing exactly one option.\n\n[State]\n",
+    );
+    prompt.push_str(&text("state"));
+    prompt.push_str("\n\n[Question]\n");
+    prompt.push_str(&text("question"));
+    prompt.push_str("\n\n[Options]\n");
+    for (i, o) in options.iter().enumerate() {
+        prompt.push_str(&format!("{}. {}\n", &LETTERS[i..i + 1], o));
+    }
+    prompt.push_str("\nAnswer:");
+
+    let base = route.base_url.trim_end_matches('/').trim_end_matches("/v1").to_string();
+    let started = std::time::Instant::now();
+    let request = serde_json::json!({
+        "prompt": prompt,
+        "n_predict": 1,
+        "n_probs": (options.len() * 2).clamp(20, 40),
+        "temperature": 0,
+        "cache_prompt": true,
+    });
+    let reply = tauri::async_runtime::block_on(async move {
+        let client = reqwest::Client::new();
+        let res = client.post(format!("{base}/completion")).json(&request).send().await.map_err(|e| e.to_string())?;
+        if !res.status().is_success() {
+            return Err(format!("The model server answered {}.", res.status().as_u16()));
+        }
+        res.json::<serde_json::Value>().await.map_err(|e| e.to_string())
+    });
+    let reply = match reply {
+        Ok(v) => v,
+        Err(e) => return fail(502, &e),
+    };
+
+    // Two response shapes have shipped; read whichever is present.
+    let mut mass = vec![0f64; options.len()];
+    if let Some(first) = reply.get("completion_probabilities").and_then(|v| v.get(0)) {
+        let mut add = |token: &str, p: f64| {
+            let t = token.trim().trim_end_matches(['.', ')', ':']).to_uppercase();
+            if t.len() == 1 {
+                if let Some(i) = LETTERS.find(&t) {
+                    if i < options.len() {
+                        mass[i] += p;
+                    }
+                }
+            }
+        };
+        if let Some(list) = first.get("top_logprobs").and_then(|v| v.as_array()) {
+            for t in list {
+                add(t["token"].as_str().unwrap_or(""), t["logprob"].as_f64().unwrap_or(f64::NEG_INFINITY).exp());
+            }
+        } else if let Some(list) = first.get("probs").and_then(|v| v.as_array()) {
+            for t in list {
+                add(t["tok_str"].as_str().unwrap_or(""), t["prob"].as_f64().unwrap_or(0.0));
+            }
+        }
+    }
+    let total: f64 = mass.iter().sum();
+    let probs: Vec<f64> = mass.iter().map(|m| if total > 0.0 { m / total } else { 1.0 / options.len() as f64 }).collect();
+    let best = probs
+        .iter()
+        .enumerate()
+        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(i, _)| options[i].clone())
+        .unwrap_or_default();
+    let mut answer = serde_json::json!({
+        "best": best,
+        "options": options.iter().zip(probs.iter()).map(|(l, p)| serde_json::json!({ "label": l, "p": p })).collect::<Vec<_>>(),
+        "ms": started.elapsed().as_millis() as u64,
+        "model": route.id,
+    });
+    if kind == "score" {
+        let expected: f64 = probs.iter().enumerate().map(|(i, p)| i as f64 * p).sum();
+        answer["expected"] = serde_json::json!(expected);
+    }
+    (200, answer.to_string(), Some(route.id.clone()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Needs a llama-server with a decision model on 127.0.0.1:8699:
+    /// `cargo test decide_live -- --ignored`
+    #[test]
+    #[ignore]
+    fn decide_live() {
+        let config = Config {
+            port: 0,
+            lan: false,
+            token_hashes: vec![],
+            keyless_local: true,
+            routes: vec![Route {
+                id: "local/jev".into(),
+                base_url: "http://127.0.0.1:8699/v1".into(),
+                upstream: "jev".into(),
+                account: None,
+                decision: true,
+            }],
+        };
+        let body = r#"{"state":"Shares of the chipmaker jumped 8% after it raised its revenue forecast.","question":"Which news section does this article belong to?","options":["World","Sports","Business","Science/Technology"]}"#;
+        let (status, answer, _) = decide(&config, body);
+        println!("{answer}");
+        assert_eq!(status, 200);
+        let v: serde_json::Value = serde_json::from_str(&answer).unwrap();
+        assert_eq!(v["best"], "Business");
+    }
+}

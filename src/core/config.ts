@@ -210,6 +210,18 @@ export interface Settings {
   /** Models chosen for providers with a native client (Anthropic, Google). */
   providerModels: Record<string, string[]>;
 
+  /** Your personal model ratings from the Arena. */
+  arena: { ratings: Record<string, { elo: number; games: number; wins: number }> };
+
+  /** Automatic model choice per message. */
+  router: {
+    enabled: boolean;
+    /** Answers easy messages; a local or cheap model. */
+    fast: { provider: string; model: string } | null;
+    /** Everything else; the strongest model you have. */
+    strong: { provider: string; model: string } | null;
+  };
+
   /** Tasks that run on a schedule. */
   schedules: ScheduledTask[];
 
@@ -324,6 +336,8 @@ export const DEFAULT_SETTINGS: Settings = {
   customProviders: [],
   providerModels: {},
   webSearch: true,
+  arena: { ratings: {} },
+  router: { enabled: false, fast: null, strong: null },
   schedules: [],
   memories: [],
   autoMemory: true,

@@ -4,6 +4,7 @@ import type { Conversation, Page } from "@/core/store";
 import { useApp } from "@/core/store";
 import { useRuntime } from "@/models/runtime";
 import { useAccount } from "@/core/account";
+import { isDecisionModel } from "@/models/decide";
 import { AccountDialog } from "./Account";
 import { Icon } from "./icons";
 import { Logo } from "./Logo";
@@ -11,6 +12,8 @@ import { SPRING, SPRING_SNAP } from "./motion";
 
 const NAV: Array<{ page: Page; label: string; icon: keyof typeof Icon }> = [
   { page: "models", label: "Model hub", icon: "grid" },
+  { page: "arena", label: "Arena", icon: "chart" },
+  { page: "decide", label: "Decisions", icon: "bolt" },
   { page: "store", label: "Store", icon: "store" },
   { page: "projects", label: "Projects", icon: "folder" },
   { page: "scheduled", label: "Scheduled", icon: "clock" },
@@ -32,6 +35,8 @@ export function Sidebar() {
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const library = useRuntime((s) => s.library);
+  const hasDecision = Boolean(loaded?.decision) || library.some((e) => isDecisionModel(e.repo));
   const account = useAccount((s) => s.session);
 
   const groups = useMemo(() => groupByAge(conversations, query), [conversations, query]);
@@ -97,7 +102,7 @@ export function Sidebar() {
           hint="Ctrl N"
           onSelect={startChat}
         />
-        {NAV.map((item) => (
+        {NAV.filter((item) => item.page !== "decide" || hasDecision).map((item) => (
           <NavItem
             key={item.page}
             active={page === item.page}

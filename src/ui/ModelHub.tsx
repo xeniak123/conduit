@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { isDecisionModel } from "@/models/decide";
 import { BrandMark, brandForModel } from "./Brand";
 import { HfConnect } from "./HfConnect";
 import { isTauri } from "@/core/host";
@@ -160,12 +161,17 @@ function RunningBanner() {
                     : error}
               </span>
             </div>
-            {loaded && !inChat && (
+            {loaded?.decision && (
+              <button className="btn btn--ink btn--small" onPointerDown={() => useApp.getState().setPage("decide")}>
+                Open Decisions
+              </button>
+            )}
+            {loaded && !loaded.decision && !inChat && (
               <button className="btn btn--ink btn--small" onPointerDown={() => void useInChat()}>
                 Use in chat
               </button>
             )}
-            {loaded && inChat && <span className="tag tag--on">Chatting with this</span>}
+            {loaded && !loaded.decision && inChat && <span className="tag tag--on">Chatting with this</span>}
             {(loaded || loading) && (
               <button className="btn btn--small" onPointerDown={() => void eject()}>
                 <Icon.eject />
@@ -265,7 +271,10 @@ function Discover({ hw }: { hw: Hardware | null }) {
               )}
               <Monogram name={model.author} repo={model.id} />
               <span className="mcard__text">
-                <b>{model.name}</b>
+                <b>
+                  {model.name}
+                  {isDecisionModel(`${model.id} ${model.tags.join(" ")}`) && <span className="tag tag--decide">Decision</span>}
+                </b>
                 <span>{model.author}</span>
               </span>
               <span className="mcard__stats">
@@ -618,7 +627,10 @@ function LibraryRow({ entry }: { entry: LibraryEntry }) {
     <div className="lrow">
       <Monogram name={entry.repo.split("/")[0]} repo={entry.repo} />
       <div className="lrow__text">
-        <b>{entry.repo.split("/").pop()?.replace(/-GGUF$/i, "")}</b>
+        <b>
+          {entry.repo.split("/").pop()?.replace(/-GGUF$/i, "")}
+          {isDecisionModel(entry.repo) && <span className="tag tag--decide">Decision model</span>}
+        </b>
         <span>
           {entry.quant} · {formatBytes(entry.size)} · {entry.repo.split("/")[0]}
         </span>

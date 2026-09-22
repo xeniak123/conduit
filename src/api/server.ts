@@ -19,6 +19,8 @@ export interface Route {
   base_url: string;
   upstream: string;
   account: string | null;
+  /** A decision model, answered through /v1/decide. */
+  decision?: boolean;
 }
 
 const NATIVE_COMPAT: Record<string, string> = {
@@ -37,6 +39,7 @@ export function routes(settings: Settings = getSettings()): Route[] {
       base_url: `http://127.0.0.1:${loaded.port}/v1`,
       upstream: loaded.name,
       account: null,
+      decision: Boolean(loaded.decision),
     });
   }
 

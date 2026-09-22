@@ -17,6 +17,8 @@ import { ModelSwitch } from "./ModelSwitch";
 import { ProjectsPage } from "./ProjectsPage";
 import { ScheduledPage } from "./ScheduledPage";
 import { AgentsPage } from "./AgentsPage";
+import { DecidePage } from "./DecidePage";
+import { ArenaPage } from "./ArenaPage";
 import { StorePage } from "./StorePage";
 import { Settings } from "./Settings";
 import { Sidebar } from "./Sidebar";
@@ -32,6 +34,8 @@ const TITLES: Record<string, string> = {
   api: "API",
   scheduled: "Scheduled",
   agents: "Agents",
+  decide: "Decisions",
+  arena: "Arena",
 };
 
 export function Shell() {
@@ -146,6 +150,8 @@ export function Shell() {
             {page === "api" && <ApiPage />}
             {page === "scheduled" && <ScheduledPage />}
             {page === "agents" && <AgentsPage />}
+            {page === "decide" && <DecidePage />}
+            {page === "arena" && <ArenaPage />}
           </motion.main>
         </AnimatePresence>
 

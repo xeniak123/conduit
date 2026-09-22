@@ -12,6 +12,7 @@ export function ModelSwitch() {
   const command = useApp((s) => s.settings.command);
   const custom = useApp((s) => s.settings.customProviders);
   const loaded = useRuntime((s) => s.loaded);
+  const auto = useApp((s) => s.settings.router?.enabled ?? false);
   const [open, setOpen] = useState(false);
 
   const provider =
@@ -24,7 +25,7 @@ export function ModelSwitch() {
       <button className="modelswitch" onPointerDown={() => setOpen(true)}>
         {command.provider === "local" && loaded && <span className="modelswitch__live" />}
         <BrandMark brand={brandForModel(command.model, command.provider)} size={20} fallback={provider} />
-        <b>{command.model}</b>
+        <b>{auto ? "Auto" : command.model}</b>
         <span className="modelswitch__via">{provider}</span>
         <Icon.chevron />
       </button>

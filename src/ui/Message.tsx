@@ -63,9 +63,15 @@ export function Message({ message }: { message: ChatMessage }) {
               <div className="msg__actions">
                 <Action label="Copy" onAct={() => copy(message.text)} icon="file" />
               </div>
-              {(message.cost ?? 0) > 0 && (
+              {((message.cost ?? 0) > 0 || message.routed) && (
                 <div className="msg__meta">
-                  <span>{formatCost(message.cost ?? 0)}</span>
+                  {message.routed && (
+                    <span className="msg__route" data-tier={message.routed.tier} title={message.routed.reason}>
+                      Auto · {message.routed.model}
+                      {message.routed.saved ? ` · saved ${formatCost(message.routed.saved)}` : ""}
+                    </span>
+                  )}
+                  {(message.cost ?? 0) > 0 && <span>{formatCost(message.cost ?? 0)}</span>}
                   {message.tokens ? <span>· {message.tokens.toLocaleString()} tokens</span> : null}
                 </div>
               )}

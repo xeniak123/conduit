@@ -3,7 +3,7 @@ import type { AgentStep } from "./agent";
 import { DEFAULT_SETTINGS, type Settings } from "./config";
 
 /** The main window's pages. Chat is one of them, not the whole app. */
-export type Page = "chat" | "models" | "store" | "projects" | "companion" | "api" | "scheduled" | "agents";
+export type Page = "chat" | "models" | "store" | "projects" | "companion" | "api" | "scheduled" | "agents" | "decide" | "arena";
 
 export type HudPhase = "idle" | "listening" | "thinking" | "working" | "done" | "error";
 
@@ -26,6 +26,8 @@ export interface ChatMessage {
   /** What this exchange cost, in USD, and how many tokens it moved. */
   cost?: number;
   tokens?: number;
+  /** Which model the router picked for this reply, and why. */
+  routed?: { model: string; tier: "fast" | "strong"; reason: string; saved: number | null };
 }
 
 export interface Conversation {

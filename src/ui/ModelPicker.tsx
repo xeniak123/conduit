@@ -8,6 +8,9 @@ import { useApp } from "@/core/store";
 import { PROVIDER_CATALOG } from "@/llm";
 import { readyProviders, useCatalog, type ModelInfo } from "@/llm/catalog";
 import { BrandMark, brandForModel, brandForProvider } from "./Brand";
+import { contenders } from "@/core/arena";
+import { tiers } from "@/core/router";
+import { Switch } from "./CompanionPage";
 import { Icon } from "./icons";
 import { SPRING, SPRING_SNAP } from "./motion";
 
@@ -242,6 +245,8 @@ export function ModelPicker({ onClose }: { onClose: () => void }) {
           <span className="kbd kbd--dim">Esc</span>
         </div>
 
+        <AutoRow />
+
         {ready.length > 0 && (
           <div className="picker__chips">
             <button className="picker__chip" aria-pressed={only === null} onPointerDown={() => setOnly(null)}>
@@ -386,5 +391,60 @@ function Pin() {
     <svg className="picker__pin" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-label="Pinned">
       <path d="M16 3l5 5-3 1-4 4 1 5-2 2-4-4-5 5-1-1 5-5-4-4 2-2 5 1 4-4z" />
     </svg>
+  );
+}
+
+/**
+ * Auto: the router picks per message. The two ends are shown and can be
+ * changed here, so "which model will answer" is never a mystery.
+ */
+function AutoRow() {
+  const settings = useApp((s) => s.settings);
+  const setSettings = useApp((s) => s.setSettings);
+  const on = settings.router?.enabled ?? false;
+  const t = tiers(settings);
+  const options = contenders(settings);
+  const set = (router: Settings["router"]) => {
+    const next = { ...settings, router };
+    setSettings(next);
+    void saveSettings(next);
+  };
+  const value = (m: { provider: string; model: string } | null) => (m ? `${m.provider}::${m.model}` : "");
+  const parse = (v: string) => (v ? { provider: v.split("::")[0], model: v.split("::").slice(1).join("::") } : null);
+  return (
+    <>
+      <div className="picker__auto" data-on={on}>
+        <div>
+          <b>Auto</b>
+          <span>
+            {on
+              ? `Easy messages go to ${t.fast?.model ?? "a faster model"}, the rest to ${t.strong.model}.`
+              : "Conduit picks the model for each message, and shows what it saved."}
+          </span>
+        </div>
+        <Switch checked={on} label="Auto" onChange={(enabled) => set({ ...settings.router, enabled, strong: settings.router.strong ?? settings.command })} />
+      </div>
+      {on && (
+        <div className="picker__tiers">
+          <span>Easy</span>
+          <select className="select" value={value(t.fast)} onChange={(e) => set({ ...settings.router, fast: parse(e.target.value) })}>
+            {!t.fast && <option value="">None available</option>}
+            {options.map((c) => (
+              <option key={value(c)} value={value(c)}>
+                {c.model} · {c.label}
+              </option>
+            ))}
+          </select>
+          <span>Hard</span>
+          <select className="select" value={value(t.strong)} onChange={(e) => set({ ...settings.router, strong: parse(e.target.value) })}>
+            {options.map((c) => (
+              <option key={value(c)} value={value(c)}>
+                {c.model} · {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+    </>
   );
 }
