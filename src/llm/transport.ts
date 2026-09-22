@@ -59,15 +59,42 @@ export function proxyFetch(auth: AuthSpec | null): typeof globalThis.fetch {
             ? await new Response(init.body as BodyInit).text()
             : undefined;
 
-    const response = await invoke<ProxyResponse>("proxy_send", {
-      request: { url, method, headers, body, auth },
-    });
+    const signal = init?.signal ?? undefined;
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    // The native call itself cannot be cancelled, but nobody has to wait for
+    // it: Stop settles this at once and the late answer is dropped.
+    const response = await abortable(
+      invoke<ProxyResponse>("proxy_send", {
+        request: { url, method, headers, body, auth },
+      }),
+      signal,
+    );
 
     return new Response(response.body, {
       status: response.status,
       headers: response.headers,
     });
   };
+}
+
+/** Resolves with `work`, or rejects the moment `signal` aborts, whichever is first. */
+export function abortable<T>(work: Promise<T>, signal?: AbortSignal | null): Promise<T> {
+  if (!signal) return work;
+  if (signal.aborted) return Promise.reject(new DOMException("Aborted", "AbortError"));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new DOMException("Aborted", "AbortError"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(
+      (v) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(v);
+      },
+      (e) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(e);
+      },
+    );
+  });
 }
 
 export const AUTH: Record<string, AuthSpec> = {

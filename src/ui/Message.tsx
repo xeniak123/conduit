@@ -56,7 +56,7 @@ export function Message({ message }: { message: ChatMessage }) {
             </span>
           ) : null}
 
-          {message.steps.length > 0 && <Activity message={message} />}
+          {message.steps.some((st) => st.kind !== "answer" && st.kind !== "thought") && <Activity message={message} />}
 
           {!message.pending && message.text && (
             <>

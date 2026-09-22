@@ -179,9 +179,13 @@ export async function sendMessage(
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    // Whatever had already streamed in stays; stopping should not erase it.
+    const written =
+      useApp.getState().conversations.find((c) => c.id === conversationId)?.messages.find((m) => m.id === replyId)?.text ?? "";
     useApp.getState().patchMessage(conversationId, replyId, {
-      text: controller.signal.aborted ? "Stopped." : message,
+      text: controller.signal.aborted ? written.trim() && written !== "Stopped." ? written : "Stopped." : message,
       pending: false,
+      streaming: false,
     });
   } finally {
     // Whatever is still buffered must land before the final text is written,
@@ -244,6 +248,11 @@ ${(m as { text?: string }).text ?? ""}`;
 export function stopRun(): void {
   const state = useApp.getState();
   state.abort?.abort();
+  state.setAbort(null);
+  for (const c of state.conversations) {
+    const pending = c.messages.find((m) => m.role === "assistant" && m.pending);
+    if (pending) state.patchMessage(c.id, pending.id, { pending: false, streaming: false, text: pending.text || "Stopped." });
+  }
   state.setScreenActive(false);
   void hideCursor();
 }

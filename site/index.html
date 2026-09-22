@@ -285,6 +285,15 @@ footer .grow { flex: 1; }
 .js .reveal { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s cubic-bezier(.2, .8, .2, 1); }
 .js .reveal.in { opacity: 1; transform: none; }
 
+.authnote {
+  position: fixed; left: 50%; top: 84px; transform: translateX(-50%); z-index: 50;
+  width: min(520px, calc(100% - 32px)); display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; align-items: center;
+  padding: 16px 18px; border-radius: 16px; background: var(--paper); border: 1px solid var(--edge-2); box-shadow: var(--float);
+}
+.authnote b { grid-column: 1; font-size: 15px; }
+.authnote span { grid-column: 1; font-size: 14px; color: var(--ink-2); }
+.authnote button { grid-column: 2; grid-row: 1 / 3; height: 36px; padding: 0 16px; border-radius: 999px; border: 0; background: var(--ink); color: var(--canvas); font: 600 14px var(--ui); cursor: pointer; }
+
 @media (max-width: 900px) {
   .window { grid-template-columns: 1fr; }
   .side { display: none; }
@@ -702,6 +711,30 @@ const SUPABASE_KEY = "sb_publishable_q5dMJSk3mFAxDaaF6lXQOQ_NG_rSdyH";
   } else {
     (async () => { for (let i = 0; ; i = (i + 1) % SCRIPT.length) await play(SCRIPT[i]); })();
   }
+
+
+  // Coming back from an account email: say what happened, then tidy the URL.
+  (() => {
+    const hash = new URLSearchParams(location.hash.slice(1));
+    const query = new URLSearchParams(location.search);
+    const error = hash.get("error_code") || query.get("error_code");
+    const ok = hash.get("access_token") || hash.get("type") === "signup" || query.get("code");
+    if (!error && !ok) return;
+    const box = document.createElement("div");
+    box.className = "authnote";
+    box.setAttribute("role", "status");
+    box.innerHTML = ok
+      ? "<b>Your email is confirmed.</b><span>Go back to Conduit and sign in with your email and password.</span>"
+      : error === "otp_expired"
+        ? "<b>This link was already used or has expired.</b><span>If you opened it before, your email is already confirmed: just sign in in Conduit. Otherwise create the account again to get a fresh link.</span>"
+        : "<b>That link did not work.</b><span>Sign in in Conduit, or create the account again for a new link.</span>";
+    const close = document.createElement("button");
+    close.textContent = "OK";
+    close.onclick = () => box.remove();
+    box.append(close);
+    document.body.append(box);
+    history.replaceState(null, "", location.pathname);
+  })();
 
   // sign-ups
   const form = document.getElementById("signup");

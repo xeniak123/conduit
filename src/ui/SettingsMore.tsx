@@ -265,7 +265,7 @@ export function About() {
       <div className="card">
         <Setting
           label="Version"
-          help={`0.3.1 · ${updates.checking ? "checking…" : updates.available ? `${updates.available.version} is available` : updates.error ? "could not check for updates" : updates.checkedAt ? "up to date" : "updates are checked automatically"}`}
+          help={`0.3.2 · ${updates.checking ? "checking…" : updates.available ? `${updates.available.version} is available` : updates.error ? "could not check for updates" : updates.checkedAt ? "up to date" : "updates are checked automatically"}`}
         >
           <button className="btn" disabled={updates.checking} onPointerDown={() => void checkForUpdate()}>
             <Icon.refresh /> Check for updates

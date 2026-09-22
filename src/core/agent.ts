@@ -1,5 +1,6 @@
 import { captureScreen, frameDescription, lastFrame } from "@/computer";
 import { getProvider, PROVIDER_CATALOG, withFallback } from "@/llm";
+import { abortable } from "@/llm/transport";
 import { keyKnown } from "./secrets";
 import type { Msg, ToolCall } from "@/llm/types";
 import { skillsPrompt } from "@/skills";
@@ -150,10 +151,10 @@ export async function runAgent(
     // Streaming only earns its complexity for the reply the user reads. Once
     // the model is chaining tool calls, the text between them is bookkeeping
     // and the buffered path is simpler and no slower in practice.
-    const response =
-      onDelta && provider.completeStream
-        ? await provider.completeStream(request, onDelta)
-        : await provider.complete(request);
+    const response = await abortable(
+      onDelta && provider.completeStream ? provider.completeStream(request, onDelta) : provider.complete(request),
+      signal,
+    );
 
     if (response.usage) {
       usage.input += response.usage.input;
@@ -189,12 +190,13 @@ export async function runAgent(
     if (touchesScreen) {
       for (const call of response.calls) {
         if (signal?.aborted) break;
-        results.push(await executeCall(call, ctx, settings, emit));
+        results.push(await abortable(executeCall(call, ctx, settings, emit), signal));
       }
     } else {
       results.push(
-        ...(await Promise.all(
-          response.calls.map((c) => executeCall(c, ctx, settings, emit)),
+        ...(await abortable(
+          Promise.all(response.calls.map((c) => executeCall(c, ctx, settings, emit))),
+          signal,
         )),
       );
     }
@@ -381,6 +383,7 @@ function systemPrompt(ctx: ToolContext, settings: Settings): string {
     "asking about transcription noise.",
     "",
     where,
+    `This computer's language is ${typeof navigator !== "undefined" ? navigator.language : "unknown"}; use it when a message does not make its language clear.`,
   ];
 
   if (project) {
@@ -393,6 +396,10 @@ function systemPrompt(ctx: ToolContext, settings: Settings): string {
   }
 
   base.push(
+    "",
+    "Always reply in the language of the user's latest message. A greeting",
+    "like \"hej\" from a Polish speaker is Polish, not Swedish: when a short",
+    "message is ambiguous, prefer the language of earlier messages.",
     "",
     "Act rather than explain. If a request maps to tools, call them. Ask a",
     "clarifying question only when getting it wrong would be destructive or a",
