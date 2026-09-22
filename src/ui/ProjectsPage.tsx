@@ -43,7 +43,7 @@ export function ProjectsPage() {
   const current = settings.projects.find((p) => p.id === open) ?? null;
 
   return (
-    <div className="page">
+    <div className="page page--wide">
       <AnimatePresence mode="wait" initial={false}>
         {current ? (
           <motion.div

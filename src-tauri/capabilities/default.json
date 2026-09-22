@@ -41,6 +41,8 @@
     "core:window:allow-primary-monitor",
     "core:window:allow-scale-factor",
     "updater:default",
-    "process:allow-restart"
+    "process:allow-restart",
+    "core:window:allow-is-visible",
+    "core:window:allow-is-minimized"
   ]
 }

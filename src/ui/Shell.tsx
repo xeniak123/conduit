@@ -26,18 +26,6 @@ import { UpdateBanner } from "./UpdateBanner";
 import { Icon } from "./icons";
 import { SPRING } from "./motion";
 
-const TITLES: Record<string, string> = {
-  models: "Model hub",
-  store: "Store",
-  projects: "Projects",
-  companion: "Companion",
-  api: "API",
-  scheduled: "Scheduled",
-  agents: "Agents",
-  decide: "Decisions",
-  arena: "Arena",
-};
-
 export function Shell() {
   const conversation = useApp(activeConversation);
   const screenActive = useApp((s) => s.screenActive);
@@ -75,7 +63,7 @@ export function Shell() {
           data-tauri-drag-region
           onDoubleClick={() => void win?.toggleMaximize()}
         >
-          {page === "chat" ? <ModelSwitch /> : <span className="topbar__title">{TITLES[page]}</span>}
+          {page === "chat" && <ModelSwitch />}
           <span className="spacer" />
           {page === "chat" && conversation && conversation.messages.length > 0 && (
             <button

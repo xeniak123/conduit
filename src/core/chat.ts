@@ -23,6 +23,9 @@ export async function sendMessage(
     images?: string[];
     /** Run in this chat rather than the open one (scheduled tasks). */
     conversationId?: string;
+    /** Earlier versions of this message, when it is an edit or a regeneration. */
+    versions?: Array<{ text: string; tail: import("./store").ChatMessage[] }>;
+    version?: number;
     /** Settings for this run only, e.g. a scheduled task's own model. */
     settings?: Settings;
     /**
@@ -52,6 +55,8 @@ export async function sendMessage(
     steps: [],
     spoken: opts.spoken,
     images: opts.images?.length ? opts.images : undefined,
+    versions: opts.versions,
+    version: opts.version,
   });
 
   const replyId = crypto.randomUUID();
@@ -242,6 +247,25 @@ ${(m as { text?: string }).text ?? ""}`;
   }
   if (merged.length && merged[merged.length - 1].role === "user") merged.pop();
   return merged;
+}
+
+/**
+ * Edits a message (or, with the same text, regenerates its answer). The
+ * previous version stays reachable with the arrows on the message.
+ */
+export async function resend(conversationId: string, messageId: string, text: string): Promise<void> {
+  const store = useApp.getState();
+  if (store.abort) return;
+  const convo = store.conversations.find((c) => c.id === conversationId);
+  const original = convo?.messages.find((m) => m.id === messageId);
+  const branch = store.branchFrom(conversationId, messageId, text);
+  if (!branch) return;
+  await sendMessage(text, {
+    conversationId,
+    versions: branch.versions,
+    version: branch.version,
+    images: original?.images,
+  });
 }
 
 /** Halts a run between actions and puts the pointer back under the user. */

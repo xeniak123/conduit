@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
-import { currentMonitor, getCurrentWindow, PhysicalPosition, type Monitor } from "@tauri-apps/api/window";
+import { currentMonitor, getCurrentWindow, PhysicalPosition, Window, type Monitor } from "@tauri-apps/api/window";
 import { AnimatePresence, motion } from "motion/react";
 import { companionOr, loadCompanions, type Activity } from "@/companion";
 import { Creature } from "@/companion/Creature";
@@ -75,7 +75,10 @@ export function Pet() {
     height: 236,
     busy: false,
     wander: true,
+    /** Conduit's own window, when it stands where the pet would. */
+    blocked: null as { from: number; to: number } | null,
   });
+  const [tucked, setTucked] = useState(false);
 
   const menuOpen = useRef(false);
   useEffect(() => {
@@ -179,7 +182,7 @@ export function Pet() {
       } else if (s.motion === "walk" && s.target !== null) {
         const dir = Math.sign(s.target - s.x);
         s.x += dir * WALK_SPEED * s.scale * dt;
-        if (Math.abs(s.target - s.x) < 2 || s.busy) {
+        if (Math.abs(s.target - s.x) < 2 || (s.busy && !s.blocked)) {
           s.target = null;
           setMotion("sit");
           saveX(s.x);
@@ -191,7 +194,8 @@ export function Pet() {
           if (s.motion !== "sleep") setMotion("sleep");
         } else if (s.wander && Math.random() < 0.55) {
           const span = s.right - s.left - s.width;
-          const goal = clamp(s.x + (Math.random() - 0.5) * 520 * s.scale, s.left, s.left + span);
+          let goal = clamp(s.x + (Math.random() - 0.5) * 520 * s.scale, s.left, s.left + span);
+          if (s.blocked && goal + s.width > s.blocked.from && goal < s.blocked.to) goal = s.x;
           if (Math.abs(goal - s.x) > 40) {
             s.target = goal;
             setFacing(goal > s.x ? 1 : -1);
@@ -228,7 +232,53 @@ export function Pet() {
       }
     }, 70);
 
+    /**
+     * Never in front of Conduit itself. When the main window covers the pet's
+     * patch of taskbar, it walks to free floor beside the window; when there
+     * is none (a maximised window), it ducks out of sight until there is.
+     */
+    const avoid = window.setInterval(async () => {
+      const s = live.current;
+      if (s.dragging || s.motion === "fall") return;
+      const main = await Window.getByLabel("main").catch(() => null);
+      if (!main) return;
+      const [visible, minimised, pos, size] = await Promise.all([
+        main.isVisible().catch(() => false),
+        main.isMinimized().catch(() => false),
+        main.outerPosition().catch(() => null),
+        main.outerSize().catch(() => null),
+      ]);
+      const covers = visible && !minimised && pos && size && pos.y + size.height > s.floor + s.height * 0.35;
+      if (!covers) {
+        s.blocked = null;
+        setTucked(false);
+        return;
+      }
+      s.blocked = { from: pos.x, to: pos.x + size.width };
+      const overlaps = s.x + s.width > s.blocked.from && s.x < s.blocked.to;
+      if (!overlaps) {
+        setTucked(false);
+        return;
+      }
+      const leftRoom = s.blocked.from - s.left;
+      const rightRoom = s.right - s.blocked.to;
+      const goLeft = leftRoom >= s.width && (leftRoom >= rightRoom || rightRoom < s.width);
+      const goRight = !goLeft && rightRoom >= s.width;
+      if (goLeft || goRight) {
+        setTucked(false);
+        const target = goLeft ? s.blocked.from - s.width - 8 : s.blocked.to + 8;
+        if (s.motion !== "walk" || s.target !== target) {
+          s.target = target;
+          setFacing(target > s.x ? 1 : -1);
+          setMotion("walk");
+        }
+      } else {
+        setTucked(true);
+      }
+    }, 600);
+
     return () => {
+      window.clearInterval(avoid);
       cancelAnimationFrame(frame);
       window.clearInterval(hit);
       void offs.then((list) => list.forEach((off) => off()));
@@ -297,7 +347,7 @@ export function Pet() {
   const size = 118 * (state.settings.petSize ?? 1);
 
   return (
-    <div className="pet" data-activity={activity}>
+    <div className="pet" data-activity={activity} data-tucked={tucked}>
       <AnimatePresence>
         {bubble && !menu && (
           <motion.div

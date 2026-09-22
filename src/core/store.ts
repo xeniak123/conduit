@@ -26,6 +26,14 @@ export interface ChatMessage {
   /** What this exchange cost, in USD, and how many tokens it moved. */
   cost?: number;
   tokens?: number;
+  /**
+   * Versions of the conversation from this user message on. Editing or
+   * regenerating keeps the old version, so nothing is lost: each entry is the
+   * message text and everything that followed it.
+   */
+  versions?: Array<{ text: string; tail: ChatMessage[] }>;
+  /** Which of `versions` is showing. */
+  version?: number;
   /** Which model the router picked for this reply, and why. */
   routed?: { model: string; tier: "fast" | "strong"; reason: string; saved: number | null };
 }
@@ -72,6 +80,14 @@ interface AppState {
   addMessage: (conversationId: string, message: ChatMessage) => void;
   patchMessage: (conversationId: string, messageId: string, patch: Partial<ChatMessage>) => void;
   appendStep: (conversationId: string, messageId: string, step: AgentStep) => void;
+  /**
+   * Starts a new version from a user message: keeps the current one, removes
+   * it and everything after from view, and returns the versions so the resent
+   * message can carry them.
+   */
+  branchFrom: (conversationId: string, messageId: string, text: string) => { versions: Array<{ text: string; tail: ChatMessage[] }>; version: number } | null;
+  /** Shows another version of the conversation from a user message on. */
+  showVersion: (conversationId: string, messageId: string, version: number) => void;
 
   /** True while the agent is driving the pointer, so the UI can say so loudly. */
   screenActive: boolean;
@@ -168,6 +184,40 @@ export const useApp = create<AppState>((set, get) => ({
                   : c.title,
             },
       ),
+    })),
+
+  branchFrom: (conversationId, messageId, text) => {
+    const convo = get().conversations.find((c) => c.id === conversationId);
+    const index = convo?.messages.findIndex((m) => m.id === messageId) ?? -1;
+    if (!convo || index < 0) return null;
+    const msg = convo.messages[index];
+    const current = { text: msg.text, tail: convo.messages.slice(index + 1) };
+    const versions = [...(msg.versions ?? [current])];
+    versions[msg.version ?? 0] = current;
+    versions.push({ text, tail: [] });
+    set((s) => ({
+      conversations: s.conversations.map((c) =>
+        c.id === conversationId ? { ...c, messages: c.messages.slice(0, index) } : c,
+      ),
+    }));
+    return { versions, version: versions.length - 1 };
+  },
+
+  showVersion: (conversationId, messageId, version) =>
+    set((s) => ({
+      conversations: s.conversations.map((c) => {
+        if (c.id !== conversationId) return c;
+        const index = c.messages.findIndex((m) => m.id === messageId);
+        const msg = c.messages[index];
+        if (index < 0 || !msg.versions?.[version]) return c;
+        const versions = [...msg.versions];
+        versions[msg.version ?? 0] = { text: msg.text, tail: c.messages.slice(index + 1) };
+        const next = versions[version];
+        return {
+          ...c,
+          messages: [...c.messages.slice(0, index), { ...msg, text: next.text, versions, version }, ...next.tail],
+        };
+      }),
     })),
 
   patchMessage: (conversationId, messageId, patch) =>

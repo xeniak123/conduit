@@ -222,6 +222,9 @@ export interface Settings {
     strong: { provider: string; model: string } | null;
   };
 
+  /** What Conduit calls you. Empty until you say. */
+  userName: string;
+
   /** Tasks that run on a schedule. */
   schedules: ScheduledTask[];
 
@@ -336,6 +339,7 @@ export const DEFAULT_SETTINGS: Settings = {
   customProviders: [],
   providerModels: {},
   webSearch: true,
+  userName: "",
   arena: { ratings: {} },
   router: { enabled: false, fast: null, strong: null },
   schedules: [],

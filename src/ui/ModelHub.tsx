@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { explain, Problem } from "./Problem";
 import { isDecisionModel } from "@/models/decide";
 import { BrandMark, brandForModel } from "./Brand";
 import { HfConnect } from "./HfConnect";
@@ -152,13 +153,13 @@ function RunningBanner() {
           <div className="running__inner">
             <span className="running__dot" data-state={loaded ? "on" : loading ? "busy" : "bad"} />
             <div className="running__text">
-              <b>{loaded ? loaded.name : loading ? "Loading model…" : "The model stopped"}</b>
+              <b>{loaded ? loaded.name : loading ? "Loading model…" : explain(error ?? "").title}</b>
               <span>
                 {loaded
-                  ? `Running on 127.0.0.1:${loaded.port} · ${loaded.context.toLocaleString()} tokens of context`
+                  ? `Running on this computer · ${loaded.context.toLocaleString()} tokens of context`
                   : loading
                     ? "Reading weights into memory. Large models take a moment."
-                    : error}
+                    : explain(error ?? "").hint}
               </span>
             </div>
             {loaded?.decision && (
@@ -176,6 +177,17 @@ function RunningBanner() {
               <button className="btn btn--small" onPointerDown={() => void eject()}>
                 <Icon.eject />
                 Eject
+              </button>
+            )}
+            {error && !loaded && !loading && /runtime|llama|server program/i.test(error) && (
+              <button
+                className="btn btn--small btn--ink"
+                onPointerDown={() => {
+                  useRuntime.getState().set({ error: null });
+                  useApp.getState().openHub("device");
+                }}
+              >
+                Fix it
               </button>
             )}
             {error && !loaded && !loading && (
@@ -252,10 +264,21 @@ function Discover({ hw }: { hw: Hardware | null }) {
         </div>
       )}
 
-      {problem && <div className="result result--bad">{problem}</div>}
+      {problem && <Problem error={problem} />}
 
       <div className="split">
         <div className="split__list">
+          {busy &&
+            results.length === 0 &&
+            Array.from({ length: 7 }, (_, i) => (
+              <div key={i} className="skel skel--row">
+                <span className="skel__box" />
+                <span className="skel__lines">
+                  <i />
+                  <i />
+                </span>
+              </div>
+            ))}
           {results.map((model, i) => (
             <motion.button
               key={model.id}
@@ -380,7 +403,7 @@ function ModelDetail({ model, hw }: { model: HubModel; hw: Hardware | null }) {
         </span>
       </div>
 
-      {problem && <div className="result result--bad">{problem}</div>}
+      {problem && <Problem error={problem} />}
 
       <div className="getbox">
         <div className="getbox__row">
@@ -527,13 +550,17 @@ function DownloadBar({ download }: { download: ReturnType<typeof useRuntime.getS
   if (download.state !== "running") {
     return (
       <div className="dl__row">
-        <span className={download.state === "failed" ? "dl__bad" : "dl__muted"}>
-          {download.state === "cancelled" ? "Download cancelled." : download.error}
-        </span>
-        <span className="spacer" />
-        <button className="btn btn--small" onPointerDown={() => dismissDownload(download.id)}>
-          Dismiss
-        </button>
+        {download.state === "failed" ? (
+          <Problem error={download.error ?? ""} onDismiss={() => dismissDownload(download.id)} />
+        ) : (
+          <>
+            <span className="dl__muted">Download cancelled.</span>
+            <span className="spacer" />
+            <button className="btn btn--small" onPointerDown={() => dismissDownload(download.id)}>
+              Dismiss
+            </button>
+          </>
+        )}
       </div>
     );
   }
@@ -773,7 +800,22 @@ function RuntimePanel() {
           </>
         )}
       </p>
-      {problem && <div className="result result--bad">{problem}</div>}
+      {problem && (
+        <Problem
+          error={problem}
+          retryLabel={recommended ? `Install ${recommended.toUpperCase()} again` : "Try again"}
+          onRetry={() => {
+            setProblem(null);
+            if (recommended)
+              void installRuntime(recommended).catch((e) => setProblem(e instanceof Error ? e.message : String(e)));
+            else
+              runtimeChoices()
+                .then(setChoices)
+                .catch((e) => setProblem(e instanceof Error ? e.message : String(e)));
+          }}
+          onDismiss={() => setProblem(null)}
+        />
+      )}
       {installing && (
         <div className="dl dl--card">
           <div className="dl__row">

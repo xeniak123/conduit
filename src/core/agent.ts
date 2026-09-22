@@ -25,6 +25,8 @@ export interface AgentStep {
   tool?: string;
   /** Milliseconds the step took, shown so slowness is attributable. */
   ms?: number;
+  /** A tool call's arguments, for describing it in words. */
+  input?: Record<string, unknown>;
 }
 
 export interface AgentRun {
@@ -260,7 +262,7 @@ async function executeCall(
     }
   }
 
-  emit({ kind: "tool", text: describe(call), tool: call.name });
+  emit({ kind: "tool", text: describe(call), tool: call.name, input: call.input });
   const started = performance.now();
 
   try {

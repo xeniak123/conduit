@@ -10,17 +10,24 @@ import { Icon } from "./icons";
 import { Logo } from "./Logo";
 import { SPRING, SPRING_SNAP } from "./motion";
 
+/** Where people go every day. */
 const NAV: Array<{ page: Page; label: string; icon: keyof typeof Icon }> = [
   { page: "models", label: "Model hub", icon: "grid" },
   { page: "arena", label: "Arena", icon: "chart" },
-  { page: "decide", label: "Decisions", icon: "bolt" },
-  { page: "store", label: "Store", icon: "store" },
   { page: "projects", label: "Projects", icon: "folder" },
+];
+
+/** Everything else, one click further, so the recent chats get the room. */
+const MORE: Array<{ page: Page; label: string; icon: keyof typeof Icon }> = [
   { page: "scheduled", label: "Scheduled", icon: "clock" },
   { page: "agents", label: "Agents", icon: "terminal" },
+  { page: "decide", label: "Decisions", icon: "bolt" },
+  { page: "store", label: "Store", icon: "store" },
   { page: "companion", label: "Companion", icon: "sparkle" },
   { page: "api", label: "API", icon: "globe" },
 ];
+
+const MORE_KEY = "conduit.nav.more";
 
 export function Sidebar() {
   const conversations = useApp((s) => s.conversations);
@@ -38,6 +45,24 @@ export function Sidebar() {
   const library = useRuntime((s) => s.library);
   const hasDecision = Boolean(loaded?.decision) || library.some((e) => isDecisionModel(e.repo));
   const account = useAccount((s) => s.session);
+  const more = MORE.filter((item) => item.page !== "decide" || hasDecision);
+  const inMore = more.some((item) => item.page === page);
+  const [moreOpen, setMoreOpen] = useState(() => {
+    try {
+      return localStorage.getItem(MORE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleMore = () => {
+    const next = !moreOpen;
+    setMoreOpen(next);
+    try {
+      localStorage.setItem(MORE_KEY, next ? "1" : "0");
+    } catch {
+      /* a remembered preference, nothing more */
+    }
+  };
 
   const groups = useMemo(() => groupByAge(conversations, query), [conversations, query]);
 
@@ -102,7 +127,7 @@ export function Sidebar() {
           hint="Ctrl N"
           onSelect={startChat}
         />
-        {NAV.filter((item) => item.page !== "decide" || hasDecision).map((item) => (
+        {NAV.map((item) => (
           <NavItem
             key={item.page}
             active={page === item.page}
@@ -112,6 +137,34 @@ export function Sidebar() {
             onSelect={() => setPage(item.page)}
           />
         ))}
+        <button className="navitem navmore" aria-expanded={moreOpen} onPointerDown={() => toggleMore()}>
+          <span className="navitem__row">
+            <Icon.chevron />
+            {moreOpen ? "Less" : "More"}
+            {!moreOpen && inMore && <span className="navitem__live" aria-label="The open page is in here" />}
+          </span>
+        </button>
+        <AnimatePresence initial={false}>
+          {moreOpen && (
+            <motion.div
+              className="navmore__list"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={SPRING_SNAP}
+            >
+              {more.map((item) => (
+                <NavItem
+                  key={item.page}
+                  active={page === item.page}
+                  icon={item.icon}
+                  label={item.label}
+                  onSelect={() => setPage(item.page)}
+                />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
 
       <div className="nav__recents">

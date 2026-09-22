@@ -66,7 +66,7 @@ export function StorePage() {
   const installedCount = settings.market.installed.length;
 
   return (
-    <div className="page">
+    <div className="page page--wide">
       <header className="page__head">
         <div>
           <h1 className="page__title">Store</h1>
@@ -135,6 +135,16 @@ export function StorePage() {
               <AppCard key={item.id} item={item} index={i} onOpen={() => setOpen(item)} />
             ))}
             {items.length === 0 && catalog && <div className="empty">Nothing matches that.</div>}
+            {!catalog &&
+              Array.from({ length: 6 }, (_, i) => (
+                <div key={i} className="skel skel--card">
+                  <span className="skel__box" />
+                  <span className="skel__lines">
+                    <i />
+                    <i />
+                  </span>
+                </div>
+              ))}
           </div>
         </>
       ) : (

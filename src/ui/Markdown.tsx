@@ -1,7 +1,20 @@
 import { useMemo, useState } from "react";
 import { parse, splitInline } from "./markdown-parse";
 import { motion } from "motion/react";
+import hljs from "highlight.js/lib/common";
 import { SPRING_SNAP } from "./motion";
+
+/** Colours a code block, falling back to plain escaped text for unknown languages. */
+function highlight(lang: string, body: string): string {
+  try {
+    const language = lang.toLowerCase();
+    if (language && hljs.getLanguage(language)) return hljs.highlight(body, { language, ignoreIllegals: true }).value;
+    if (body.length < 20_000) return hljs.highlightAuto(body).value;
+  } catch {
+    /* fall through to plain text */
+  }
+  return body.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
+}
 
 export function Markdown({ text }: { text: string }) {
   const blocks = useMemo(() => parse(text), [text]);
@@ -72,6 +85,7 @@ function CodeBlock({ lang, body }: { lang: string; body: string }) {
   const [copied, setCopied] = useState(false);
   const previewable = /^(html|svg|xml)$/i.test(lang) || (lang === "" && /^\s*<(!doctype|html|svg)/i.test(body));
   const [preview, setPreview] = useState(previewable && body.length > 200);
+  const highlighted = useMemo(() => highlight(lang, body), [lang, body]);
 
   const copy = async () => {
     try {
@@ -115,7 +129,8 @@ function CodeBlock({ lang, body }: { lang: string; body: string }) {
         />
       ) : (
         <pre className="code__body">
-          <code>{body}</code>
+          {/* highlight.js escapes the source, so the markup it returns is safe to inject. */}
+          <code className="hljs" dangerouslySetInnerHTML={{ __html: highlighted }} />
         </pre>
       )}
     </div>
