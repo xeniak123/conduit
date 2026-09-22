@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { setComputerUseEnabled } from "@/computer";
+import { hideCursor, setComputerUseEnabled } from "@/computer";
 import { initAudit } from "@/core/audit";
 import { getSettings, initSettings } from "@/core/config";
 import { flush, loadConversations, persistConversations } from "@/core/history";
@@ -119,6 +119,8 @@ export default function App() {
 
       if (!isOverlay && !isQuick) {
         await step("registering tools", async () => {
+          // A marker left over from a run that never finished is hidden at start.
+          void hideCursor();
           let screenOn = getSettings().computerUse.enabled;
           setComputerUseEnabled(screenOn);
           // The Screen switch lives in the message box now, so the tools have

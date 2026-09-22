@@ -48,10 +48,16 @@ export function toScreen(x: number, y: number): { x: number; y: number } {
 }
 
 /** Parks the overlay marker wherever the agent is about to act. */
+let idle: ReturnType<typeof setTimeout> | null = null;
+
 async function markCursor(x: number, y: number): Promise<void> {
   // The marker is an honesty signal, not a prerequisite: if it cannot be
   // drawn the action should still happen, with the banner still showing.
   await invoke("agent_cursor", { x, y }).catch(() => undefined);
+  // It must never outlive the run. If the run ends without cleanup (a reload,
+  // a crash, a closed window), the marker goes away on its own.
+  if (idle) clearTimeout(idle);
+  idle = setTimeout(() => void hideCursor(), 20_000);
 }
 
 export async function hideCursor(): Promise<void> {
