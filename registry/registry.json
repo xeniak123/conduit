@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-09-21",
+  "updated": "2026-09-22",
   "items": [
     {
       "id": "mcp-supabase",
@@ -10,12 +10,19 @@
       "author": "Supabase",
       "license": "Apache-2.0",
       "homepage": "https://github.com/supabase-community/supabase-mcp",
-      "tags": ["database", "backend"],
+      "tags": [
+        "database",
+        "backend"
+      ],
       "icon": "database",
       "tint": "mint",
       "mcp": {
         "command": "npx",
-        "args": ["-y", "@supabase/mcp-server-supabase@latest", "--read-only"],
+        "args": [
+          "-y",
+          "@supabase/mcp-server-supabase@latest",
+          "--read-only"
+        ],
         "env": [
           {
             "name": "SUPABASE_ACCESS_TOKEN",
@@ -35,12 +42,18 @@
       "author": "Notion",
       "license": "MIT",
       "homepage": "https://github.com/makenotion/notion-mcp-server",
-      "tags": ["notes", "docs"],
+      "tags": [
+        "notes",
+        "docs"
+      ],
       "icon": "book",
       "tint": "ink",
       "mcp": {
         "command": "npx",
-        "args": ["-y", "@notionhq/notion-mcp-server"],
+        "args": [
+          "-y",
+          "@notionhq/notion-mcp-server"
+        ],
         "env": [
           {
             "name": "NOTION_TOKEN",
@@ -59,10 +72,19 @@
       "author": "Model Context Protocol",
       "license": "MIT",
       "homepage": "https://github.com/modelcontextprotocol/servers",
-      "tags": ["developer", "testing"],
+      "tags": [
+        "developer",
+        "testing"
+      ],
       "icon": "plug",
       "tint": "sky",
-      "mcp": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-everything"] }
+      "mcp": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-everything"
+        ]
+      }
     },
     {
       "id": "skill-write-tests",
@@ -71,10 +93,15 @@
       "summary": "Tests that pin down behaviour, not implementation, and fail for the right reason.",
       "author": "Conduit community",
       "license": "MIT",
-      "tags": ["development", "testing"],
+      "tags": [
+        "development",
+        "testing"
+      ],
       "icon": "review",
       "tint": "lime",
-      "files": { "SKILL.md": "skills/write-tests/SKILL.md" }
+      "files": {
+        "SKILL.md": "skills/write-tests/SKILL.md"
+      }
     },
     {
       "id": "skill-explain-error",
@@ -83,10 +110,14 @@
       "summary": "Turns a stack trace or an error message into what went wrong and what to do.",
       "author": "Conduit community",
       "license": "MIT",
-      "tags": ["development"],
+      "tags": [
+        "development"
+      ],
       "icon": "bug",
       "tint": "rose",
-      "files": { "SKILL.md": "skills/explain-error/SKILL.md" }
+      "files": {
+        "SKILL.md": "skills/explain-error/SKILL.md"
+      }
     },
     {
       "id": "pet-koi",
@@ -95,10 +126,169 @@
       "summary": "A small koi that swims in place and blows bubbles when it thinks.",
       "author": "Conduit community",
       "license": "MIT",
-      "tags": ["pet"],
+      "tags": [
+        "pet"
+      ],
       "icon": "creature",
       "tint": "ember",
-      "files": { "koi.json": "companions/koi.json" }
+      "files": {
+        "koi.json": "companions/koi.json"
+      }
+    },
+    {
+      "id": "mcp-huggingface",
+      "kind": "mcp",
+      "name": "Hugging Face",
+      "summary": "Search models, datasets, Spaces and papers on the Hugging Face Hub.",
+      "author": "Hugging Face",
+      "license": "Apache-2.0",
+      "homepage": "https://huggingface.co/settings/mcp",
+      "tags": [
+        "models",
+        "research"
+      ],
+      "icon": "nodes",
+      "tint": "sun",
+      "featured": true,
+      "mcp": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "mcp-remote",
+          "https://huggingface.co/mcp"
+        ],
+        "note": "Opens a browser the first time so you can sign in to Hugging Face."
+      }
+    },
+    {
+      "id": "mcp-brave-search",
+      "kind": "mcp",
+      "name": "Brave Search",
+      "summary": "Private web, news and image search with Brave's own index.",
+      "author": "Brave",
+      "license": "MIT",
+      "homepage": "https://github.com/brave/brave-search-mcp-server",
+      "tags": [
+        "search",
+        "web"
+      ],
+      "icon": "browser",
+      "tint": "ember",
+      "mcp": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@brave/brave-search-mcp-server"
+        ],
+        "env": [
+          {
+            "name": "BRAVE_API_KEY",
+            "secret": "mcp-brave-search",
+            "label": "Brave Search API key",
+            "help": "Free tier at api-dashboard.search.brave.com."
+          }
+        ]
+      }
+    },
+    {
+      "id": "mcp-linear",
+      "kind": "mcp",
+      "name": "Linear",
+      "summary": "Find, create and update Linear issues, projects and comments.",
+      "author": "Linear",
+      "license": "Proprietary service",
+      "homepage": "https://linear.app/docs/mcp",
+      "tags": [
+        "issues",
+        "planning"
+      ],
+      "icon": "steps",
+      "tint": "grape",
+      "mcp": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "mcp-remote",
+          "https://mcp.linear.app/sse"
+        ],
+        "note": "Opens a browser the first time so you can authorise your Linear workspace."
+      }
+    },
+    {
+      "id": "mcp-sentry",
+      "kind": "mcp",
+      "name": "Sentry",
+      "summary": "Read errors, issues and stack traces from your Sentry projects.",
+      "author": "Sentry",
+      "license": "FSL-1.1",
+      "homepage": "https://github.com/getsentry/sentry-mcp",
+      "tags": [
+        "errors",
+        "developer"
+      ],
+      "icon": "bug",
+      "tint": "grape",
+      "mcp": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@sentry/mcp-server@latest"
+        ],
+        "env": [
+          {
+            "name": "SENTRY_ACCESS_TOKEN",
+            "secret": "mcp-sentry",
+            "label": "Sentry user auth token",
+            "help": "Settings, Account, API, Auth tokens."
+          }
+        ]
+      }
+    },
+    {
+      "id": "mcp-cloudflare-docs",
+      "kind": "mcp",
+      "name": "Cloudflare docs",
+      "summary": "Up-to-date answers from Cloudflare's developer documentation.",
+      "author": "Cloudflare",
+      "license": "Apache-2.0",
+      "homepage": "https://github.com/cloudflare/mcp-server-cloudflare",
+      "tags": [
+        "docs",
+        "developer"
+      ],
+      "icon": "book",
+      "tint": "sun",
+      "mcp": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "mcp-remote",
+          "https://docs.mcp.cloudflare.com/mcp"
+        ]
+      }
+    },
+    {
+      "id": "mcp-figma",
+      "kind": "mcp",
+      "name": "Figma",
+      "summary": "Read the frames you select in the Figma desktop app, to turn designs into code.",
+      "author": "Figma",
+      "license": "Proprietary service",
+      "homepage": "https://help.figma.com/hc/en-us/articles/32132100833559",
+      "tags": [
+        "design"
+      ],
+      "icon": "nodes",
+      "tint": "rose",
+      "mcp": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "mcp-remote",
+          "http://127.0.0.1:3845/mcp"
+        ],
+        "note": "Turn on the MCP server in Figma desktop preferences first."
+      }
     }
   ]
 }

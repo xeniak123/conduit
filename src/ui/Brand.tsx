@@ -209,8 +209,13 @@ export function brandForProvider(id: string): string | null {
 
 /** For store items: matched on the id and name, e.g. `mcp-github`, "GitHub". */
 export function brandForApp(id: string, name = ""): string | null {
-  const text = `${id} ${name}`.toLowerCase();
-  for (const key of Object.keys(BRANDS)) {
+  // The kind prefix says what an item is, not whose it is.
+  const text = `${id.replace(/^(mcp|skill|pet|prompt)-/, "")} ${name}`.toLowerCase();
+  // Longest names first, so "claudecode" wins over "claude".
+  const keys = Object.keys(BRANDS)
+    .filter((k) => k !== "mcp" && k !== "local")
+    .sort((a, b) => b.length - a.length);
+  for (const key of keys) {
     if (key.length < 3) continue;
     if (new RegExp(`(^|[^a-z])${key}([^a-z]|$)`).test(text)) return key;
   }
@@ -222,6 +227,11 @@ export function brandForApp(id: string, name = ""): string | null {
 
 export function hasBrand(key: string | null | undefined): boolean {
   return Boolean(key && BRANDS[key]);
+}
+
+/** A real published mark, not a monogram stand-in. */
+export function hasLogo(key: string | null | undefined): boolean {
+  return Boolean(key && BRANDS[key]?.path);
 }
 
 /**

@@ -1,4 +1,4 @@
-import { BrandMark, brandForApp, hasBrand } from "./Brand";
+import { BrandMark, brandForApp, hasLogo } from "./Brand";
 
 /**
  * App icons for the store.
@@ -97,7 +97,7 @@ export function AppIcon({
   /** A real product (GitHub, Notion…) shows its own mark on a white tile. */
   brand?: string | null;
 }) {
-  if (brand && hasBrand(brand)) {
+  if (brand && hasLogo(brand)) {
     return (
       <span className="appicon appicon--brand" style={{ width: size, height: size, borderRadius: size * 0.27 }}>
         <BrandMark brand={brand} size={size} />
