@@ -48,7 +48,7 @@ interface Session {
   access_token: string;
   refresh_token: string;
   expires_at: number;
-  user: { id: string; email: string };
+  user: { id: string; email: string; created?: string };
 }
 
 interface AccountState {
@@ -99,6 +99,9 @@ async function auth(path: string, body: unknown): Promise<Record<string, unknown
 }
 
 function friendly(msg: string): string {
+  if (/same.*password|different from the old/i.test(msg)) return "Choose a password different from the current one.";
+  if (/rate limit|too many|security purposes/i.test(msg)) return "Too many emails in a short time. Wait a minute and try again.";
+  if (/invalid.*email|unable to validate email/i.test(msg)) return "That does not look like an email address.";
   if (/invalid login/i.test(msg)) return "That email and password do not match.";
   if (/not confirmed/i.test(msg)) return "Confirm your email first: open the link we sent you, then sign in.";
   if (/already registered/i.test(msg)) return "That email already has an account. Sign in instead.";
@@ -107,12 +110,12 @@ function friendly(msg: string): string {
 }
 
 function toSession(json: Record<string, unknown>): Session {
-  const user = json.user as { id: string; email: string };
+  const user = json.user as { id: string; email: string; created_at?: string };
   return {
     access_token: String(json.access_token),
     refresh_token: String(json.refresh_token),
     expires_at: Date.now() + Number(json.expires_in ?? 3600) * 1000,
-    user: { id: user.id, email: user.email },
+    user: { id: user.id, email: user.email, created: user.created_at },
   };
 }
 
@@ -134,6 +137,45 @@ export async function signIn(email: string, password: string): Promise<void> {
   storeSession(session);
   useAccount.getState().set({ session, error: null });
   await pull();
+}
+
+/** Where account emails send people back to: the website, which explains what happened. */
+export const SITE = "https://xeniak123.github.io/conduit/";
+
+/** Emails a link for choosing a new password. Says nothing about whether the address has an account. */
+export async function resetPassword(email: string): Promise<void> {
+  await auth(`recover?redirect_to=${encodeURIComponent(SITE)}`, { email });
+}
+
+/** Sends the confirmation email again, for a link that expired or went to spam. */
+export async function resendConfirmation(email: string): Promise<void> {
+  await auth(`resend?redirect_to=${encodeURIComponent(SITE)}`, { type: "signup", email });
+}
+
+export async function changePassword(password: string): Promise<void> {
+  const session = await fresh();
+  if (!session) throw new Error("Sign in first.");
+  const res = await call(`${CLOUD_URL}/auth/v1/user`, {
+    method: "PUT",
+    headers: { apikey: CLOUD_KEY, authorization: `Bearer ${session.access_token}`, "content-type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  if (!res.ok) {
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    throw new Error(friendly(String(json.msg ?? json.message ?? `Answered ${res.status}.`)));
+  }
+}
+
+/** Removes everything synced to the account. Local settings stay as they are. */
+export async function deleteSyncedData(): Promise<void> {
+  const session = await fresh();
+  if (!session) return;
+  const res = await call(`${CLOUD_URL}/rest/v1/user_state?user_id=eq.${session.user.id}`, {
+    method: "DELETE",
+    headers: { apikey: CLOUD_KEY, authorization: `Bearer ${session.access_token}` },
+  });
+  if (!res.ok) throw new Error(`Could not delete (${res.status}).`);
+  useAccount.getState().set({ lastSync: null });
 }
 
 export function signOut(): void {

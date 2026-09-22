@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useApp } from "@/core/store";
 import { decide, isDecisionModel, type Decision, type DecisionKind } from "@/models/decide";
+import { distance, key, makeWorld, options, randomFree, same, stepToward, type Pos, type World } from "@/models/grid";
 import { load, useRuntime } from "@/models/runtime";
 import { Icon } from "./icons";
 import { SPRING, SPRING_SNAP } from "./motion";
@@ -313,155 +314,228 @@ function Console({ port }: { port: number }) {
   );
 }
 
+const BEST_KEY = "conduit.decide.best";
+const SPEEDS = { fast: 0, normal: 180, slow: 500 } as const;
+const GRID = 11;
+
 /**
- * A tiny world the model plays live: reach the coin, avoid the walls.
- * Each step is one decision from a text description of the surroundings,
- * which is exactly how these models are meant to sit inside a game loop.
+ * A small game the model plays live: collect coins, keep away from the ghost.
+ * Each move is one decision over the legal moves, each described by what it
+ * leads to. The ghost is what makes it a decision rather than a path: the
+ * nearest coin is not always the safest move.
  */
-const SIZE = 9;
-type Pos = { r: number; c: number };
-const DELTA = { up: { r: -1, c: 0 }, down: { r: 1, c: 0 }, left: { r: 0, c: -1 }, right: { r: 0, c: 1 } } as const;
-
 function Game({ port }: { port: number }) {
-  const [me, setMe] = useState<Pos>({ r: 7, c: 1 });
-  const [coin, setCoin] = useState<Pos>({ r: 1, c: 7 });
-  const [walls] = useState<Set<string>>(() => new Set(["3,3", "3,4", "3,5", "5,5", "6,5", "5,2"]));
+  const [world, setWorld] = useState<World>(() => makeWorld(GRID));
+  const [me, setMe] = useState<Pos>(() => ({ r: GRID - 1, c: 0 }));
+  const [coin, setCoin] = useState<Pos>(() => ({ r: 0, c: GRID - 1 }));
+  const [ghost, setGhost] = useState<Pos | null>(null);
+  const [withGhost, setWithGhost] = useState(true);
+  const [speed, setSpeed] = useState<keyof typeof SPEEDS>("normal");
   const [running, setRunning] = useState(false);
-  const [stats, setStats] = useState({ moves: 0, coins: 0, ms: 0 });
-  const [last, setLast] = useState<Decision | null>(null);
-  const stop = useRef(false);
-
-  const free = (p: Pos) => p.r >= 0 && p.c >= 0 && p.r < SIZE && p.c < SIZE && !walls.has(`${p.r},${p.c}`);
-
-  /** Steps to the goal around the walls (breadth-first), or Infinity. */
-  const distance = (from: Pos, goal: Pos): number => {
-    const seen = new Set([`${from.r},${from.c}`]);
-    let frontier = [from];
-    for (let steps = 0; frontier.length; steps++) {
-      const next: Pos[] = [];
-      for (const p of frontier) {
-        if (p.r === goal.r && p.c === goal.c) return steps;
-        for (const d of Object.values(DELTA)) {
-          const q = { r: p.r + d.r, c: p.c + d.c };
-          const k = `${q.r},${q.c}`;
-          if (free(q) && !seen.has(k)) {
-            seen.add(k);
-            next.push(q);
-          }
-        }
-      }
-      frontier = next;
+  const [stats, setStats] = useState({ moves: 0, coins: 0, ms: 0, lives: 3 });
+  const [best, setBest] = useState(() => {
+    try {
+      return Number(localStorage.getItem(BEST_KEY)) || 0;
+    } catch {
+      return 0;
     }
-    return Infinity;
-  };
+  });
+  const [last, setLast] = useState<Decision | null>(null);
+  const [prompt, setPrompt] = useState("");
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [trail, setTrail] = useState<string[]>([]);
+  const [message, setMessage] = useState<string | null>(null);
+  const stop = useRef(false);
+  // The whole board, ghost included, is on show before the first move.
+  useEffect(() => {
+    reset(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const speedRef = useRef<number>(SPEEDS.normal);
+  speedRef.current = SPEEDS[speed];
 
-  /**
-   * The way decision models are meant to be fed: only the moves that are
-   * possible, each with what it leads to. The model weighs consequences; it
-   * does not have to do geometry in its head, which a 2B model does badly.
-   */
-  const choices = (p: Pos, goal: Pos, recent: string[]) => {
-    const now = distance(p, goal);
-    return (Object.keys(DELTA) as Array<keyof typeof DELTA>)
-      .map((dir) => {
-        const q = { r: p.r + DELTA[dir].r, c: p.c + DELTA[dir].c };
-        if (!free(q)) return null;
-        const after = distance(q, goal);
-        const effect = after < now ? "closer to the coin" : after > now ? "farther from the coin" : "no closer";
-        const revisit = recent.includes(`${q.r},${q.c}`) ? ", back to a square you just left" : "";
-        return { dir, pos: q, label: `move ${dir}: ${after} steps from the coin, ${effect}${revisit}` };
-      })
-      .filter((c): c is { dir: keyof typeof DELTA; pos: Pos; label: string } => c !== null);
+  const reset = (fresh = true) => {
+    const w = fresh ? makeWorld(GRID) : world;
+    const start = randomFree(w, []);
+    const c = randomFree(w, [start]);
+    const g = withGhost ? randomFree(w, [start, c]) : null;
+    setWorld(w);
+    setMe(start);
+    setCoin(c);
+    setGhost(g);
+    setTrail([]);
+    setLast(null);
+    setMessage(null);
+    setStats({ moves: 0, coins: 0, ms: 0, lives: 3 });
+    return { w, start, c, g };
   };
 
   const play = async () => {
     stop.current = false;
     setRunning(true);
-    let pos = me;
-    let goal = coin;
-    let totalMs = 0;
-    let moves = 0;
-    let coins = stats.coins;
-    let lastMove: string | null = null;
+    setMessage(null);
+    let { w, start: pos, c: goal, g } =
+      stats.lives > 0 && stats.moves > 0 ? { w: world, start: me, c: coin, g: ghost } : reset(stats.moves > 0);
+    if (withGhost && !g) g = randomFree(w, [pos, goal]);
+    let { moves, coins, lives } = stats.lives > 0 && stats.moves > 0 ? stats : { moves: 0, coins: 0, lives: 3 };
+    let totalMs = stats.ms * moves;
     const recent: string[] = [];
-    while (!stop.current && moves < 300) {
-      const options = choices(pos, goal, recent);
-      if (!options.length) break;
-      const d = await decide(port, {
-        state: `You are playing a grid game and want to reach the coin in as few moves as possible. You are ${distance(pos, goal)} steps from it.${lastMove ? ` Your last move was ${lastMove}.` : ""}`,
-        question: "Which move should you make?",
-        options: options.map((o) => o.label),
-      });
-      const best = options[d.options.findIndex((o) => o.label === d.best)] ?? options[0];
-      recent.push(`${pos.r},${pos.c}`);
+
+    while (!stop.current && lives > 0 && moves < 500) {
+      const opts = options(w, pos, goal, g, recent);
+      if (!opts.length) break;
+      const state = g
+        ? "You collect coins on a grid while a ghost chases you. Getting caught is the worst outcome. Among safe moves, get to the coin."
+        : `You collect coins on a grid. The nearest coin is ${distance(w, pos, goal)} steps away.`;
+      const question = "Which move is best?";
+      const d = await decide(port, { state, question, options: opts.map((o) => o.label) });
+      setPrompt(`${state}\n\n${question}\n${opts.map((o, i) => `${String.fromCharCode(65 + i)}. ${o.label}`).join("\n")}`);
+      const chosen = opts[d.options.findIndex((o) => o.label === d.best)] ?? opts[0];
+
+      recent.push(key(pos));
       if (recent.length > 6) recent.shift();
-      pos = best.pos;
-      lastMove = best.dir;
+      pos = chosen.pos;
       moves += 1;
       totalMs += d.ms;
-      if (pos.r === goal.r && pos.c === goal.c) {
+      setTrail((t) => [...t.slice(-7), key(pos)]);
+
+      if (same(pos, goal)) {
         coins += 1;
         recent.length = 0;
-        do {
-          goal = { r: Math.floor(Math.random() * SIZE), c: Math.floor(Math.random() * SIZE) };
-        } while (!free(goal) || (goal.r === pos.r && goal.c === pos.c));
+        goal = randomFree(w, [pos, ...(g ? [g] : [])]);
         setCoin(goal);
       }
+      // The ghost moves every other turn, so a good player can stay ahead.
+      if (g && moves % 2 === 0) g = stepToward(w, g, pos);
+      if (g && same(g, pos)) {
+        lives -= 1;
+        setMessage(lives > 0 ? "Caught! One life lost." : null);
+        g = randomFree(w, [pos, goal]);
+        recent.length = 0;
+      }
       setMe(pos);
-      // Bars show the direction; the full option text is what the model read.
-      setLast({ ...d, best: best.dir, options: d.options.map((o, i) => ({ ...o, label: options[i].dir })) });
-      setStats({ moves, coins, ms: Math.round(totalMs / moves) });
+      setGhost(g);
+      setLast({ ...d, best: chosen.dir, options: d.options.map((o, i) => ({ ...o, label: opts[i].dir })) });
+      setStats({ moves, coins, ms: Math.round(totalMs / moves), lives });
+      if (coins > best) {
+        setBest(coins);
+        try {
+          localStorage.setItem(BEST_KEY, String(coins));
+        } catch {
+          /* a remembered score only */
+        }
+      }
+      if (speedRef.current) await new Promise((r) => setTimeout(r, speedRef.current));
     }
+    if (lives <= 0) setMessage(`Game over: ${coins} ${coins === 1 ? "coin" : "coins"} in ${moves} moves.`);
     setRunning(false);
   };
 
-  const cells = useMemo(() => Array.from({ length: SIZE * SIZE }, (_, i) => ({ r: Math.floor(i / SIZE), c: i % SIZE })), []);
+  const all = useMemo(
+    () => Array.from({ length: world.size * world.size }, (_, i) => ({ r: Math.floor(i / world.size), c: i % world.size })),
+    [world],
+  );
 
   return (
     <div className="dec__layout">
-      <div className="dec__game">
-        {cells.map((cell) => {
-          const key = `${cell.r},${cell.c}`;
-          const kind = walls.has(key) ? "wall" : cell.r === me.r && cell.c === me.c ? "me" : cell.r === coin.r && cell.c === coin.c ? "coin" : "";
-          return (
-            <span key={key} className="dec__cell" data-kind={kind}>
-              {kind === "me" && <motion.i layoutId="dec-me" className="dec__me" transition={{ type: "spring", bounce: 0, duration: 0.12 }} />}
-            </span>
-          );
-        })}
-      </div>
-      <div className="dec__result">
-        <div className="dec__stats">
-          <div><b>{stats.coins}</b><span>coins</span></div>
-          <div><b>{stats.moves}</b><span>moves</span></div>
-          <div><b>{stats.ms || "–"}</b><span>ms per move</span></div>
+      <div className="dec__stage">
+        <div className="dec__game" style={{ gridTemplateColumns: `repeat(${world.size}, 1fr)` }}>
+          {all.map((cell) => {
+            const k = key(cell);
+            const kind = world.walls.has(k)
+              ? "wall"
+              : same(cell, me)
+                ? "me"
+                : ghost && same(cell, ghost)
+                  ? "ghost"
+                  : same(cell, coin)
+                    ? "coin"
+                    : "";
+            const age = trail.indexOf(k);
+            return (
+              <span
+                key={k}
+                className="dec__cell"
+                data-kind={kind}
+                style={age >= 0 && !kind ? { ["--trail" as string]: String((age + 1) / trail.length) } : undefined}
+                data-trail={age >= 0 && !kind}
+              >
+                {kind === "me" && <motion.i layoutId="dec-me" className="dec__me" transition={{ type: "spring", bounce: 0, duration: 0.12 }} />}
+                {kind === "ghost" && <motion.i layoutId="dec-ghost" className="dec__ghost" transition={{ type: "spring", bounce: 0, duration: 0.18 }} />}
+              </span>
+            );
+          })}
         </div>
         <AnimatePresence>
-          {last && (
-            <div className="dec__bars">
-              {last.options.map((o) => (
-                <div key={o.label} className="dec__bar" data-best={o.label === last.best}>
-                  <span className="dec__barlabel">{o.label}</span>
-                  <span className="dec__track"><i style={{ width: `${Math.max(1, o.p * 100)}%` }} /></span>
-                  <span className="dec__pct">{(o.p * 100).toFixed(0)}%</span>
-                </div>
-              ))}
-            </div>
+          {message && (
+            <motion.div className="dec__toast" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              {message}
+            </motion.div>
           )}
         </AnimatePresence>
-        <button
-          className="btn btn--ink btn--lg"
-          onPointerDown={() => {
-            if (running) stop.current = true;
-            else void play();
-          }}
-        >
-          {running ? <Icon.pause /> : <Icon.play />} {running ? "Stop" : "Let it play"}
+      </div>
+
+      <div className="dec__result">
+        <div className="dec__stats">
+          <div><b>{stats.coins}</b><span>coins · best {best}</span></div>
+          <div><b>{"♥".repeat(Math.max(0, stats.lives)) || "–"}</b><span>lives</span></div>
+          <div><b>{stats.ms || "–"}</b><span>ms per move</span></div>
+        </div>
+
+        {last && (
+          <div className="dec__bars">
+            {last.options.map((o) => (
+              <div key={o.label} className="dec__bar" data-best={o.label === last.best}>
+                <span className="dec__barlabel">{o.label}</span>
+                <span className="dec__track"><i style={{ width: `${Math.max(1, o.p * 100)}%` }} /></span>
+                <span className="dec__pct">{(o.p * 100).toFixed(0)}%</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="dec__controls">
+          <button
+            className="btn btn--ink btn--lg"
+            onPointerDown={() => {
+              if (running) stop.current = true;
+              else void play();
+            }}
+          >
+            {running ? <Icon.pause /> : <Icon.play />} {running ? "Pause" : stats.moves && stats.lives > 0 ? "Continue" : "Let it play"}
+          </button>
+          <button className="btn btn--lg" disabled={running} onPointerDown={() => reset(true)}>
+            <Icon.refresh /> New map
+          </button>
+        </div>
+
+        <div className="dec__options2">
+          <div className="seg">
+            {(Object.keys(SPEEDS) as Array<keyof typeof SPEEDS>).map((s) => (
+              <button key={s} className="seg__item" aria-current={speed === s} onPointerDown={() => setSpeed(s)}>
+                {speed === s && <motion.span layoutId="dec-speed" className="seg__pill" transition={SPRING_SNAP} />}
+                <span>{s[0].toUpperCase() + s.slice(1)}</span>
+              </button>
+            ))}
+          </div>
+          <label className="dec__live">
+            <input
+              type="checkbox"
+              checked={withGhost}
+              disabled={running}
+              onChange={(e) => {
+                setWithGhost(e.target.checked);
+                setGhost(e.target.checked ? randomFree(world, [me, coin]) : null);
+              }}
+            />
+            Ghost
+          </label>
+        </div>
+
+        <button className="problem__more" onPointerDown={() => setShowPrompt(!showPrompt)}>
+          {showPrompt ? "Hide what the model reads" : "Show what the model reads"}
         </button>
-        <p className="muted">
-          Each move is one decision from a sentence describing the surroundings. A chat model would take seconds per
-          move; this one decides in the time a frame takes to draw.
-        </p>
+        {showPrompt && <pre className="dec__code dec__prompt">{prompt || "Start the game to see the first decision."}</pre>}
       </div>
     </div>
   );
