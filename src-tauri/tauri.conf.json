@@ -1,0 +1,135 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Conduit",
+  "version": "0.3.0",
+  "identifier": "dev.conduit.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: blob: asset: http://asset.localhost; font-src 'self'; connect-src 'self' ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
+      "devCsp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: blob: asset: http://asset.localhost; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420 http://localhost:1420 ws://127.0.0.1:1420 http://127.0.0.1:1420; object-src 'none'"
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "Conduit",
+        "width": 1120,
+        "height": 760,
+        "minWidth": 720,
+        "minHeight": 520,
+        "resizable": true,
+        "visible": false,
+        "center": true,
+        "decorations": false,
+        "transparent": false,
+        "backgroundColor": "#0b0b0d",
+        "titleBarStyle": "Overlay"
+      },
+      {
+        "label": "cursor",
+        "url": "index.html#/cursor",
+        "title": "Conduit pointer",
+        "width": 40,
+        "height": 40,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "focus": false,
+        "visible": false
+      },
+      {
+        "label": "quick",
+        "url": "index.html#/quick",
+        "title": "Conduit quick",
+        "width": 640,
+        "height": 320,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "center": true,
+        "visible": false
+      },
+      {
+        "label": "companion",
+        "url": "index.html#/companion",
+        "title": "Conduit companion",
+        "width": 380,
+        "height": 200,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": true,
+        "shadow": false,
+        "focus": false,
+        "visible": false
+      },
+      {
+        "label": "pet",
+        "url": "index.html#/pet",
+        "title": "Conduit pet",
+        "width": 240,
+        "height": 236,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "focus": false,
+        "visible": false
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "category": "Productivity",
+    "shortDescription": "AI hub for your desktop",
+    "longDescription": "Conduit runs models on your computer or in the cloud, talks and listens, works in your apps and on your screen, and offers one API for everything.",
+    "publisher": "Conduit contributors",
+    "copyright": "MIT licensed",
+    "licenseFile": "../LICENSE",
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "installer/header.bmp",
+        "sidebarImage": "installer/sidebar.bmp",
+        "installMode": "currentUser",
+        "languages": [
+          "English",
+          "Polish"
+        ],
+        "displayLanguageSelector": true
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERERTJCMTBFQjAzMEMyODYKUldTR3dqQ3dEckhpM1MrTjhPb3BOYktTa3FGMStyRm9kNXVwNVliaFZ5Q24xdnpzckk5QkVRSUQK",
+      "endpoints": [
+        "https://github.com/xeniak123/conduit/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

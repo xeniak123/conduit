@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Conduit">
+  <title>Conduit</title>
+  <desc>Two nested brackets opening to the right: a channel narrowing as something passes through it.</desc>
+  <!--
+    The mark, on its own, in one colour.
+
+    currentColor throughout, so it inherits wherever it is placed — a toolbar,
+    a dark plate, a printed sheet. A brand that only works in one colour cannot
+    survive a menu bar or a favicon.
+  -->
+  <g fill="none" stroke="currentColor" stroke-linecap="round">
+    <path d="M58 18H34a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h24" stroke-width="12"/>
+    <path d="M64 40H48a8 8 0 0 0-8 8v4a8 8 0 0 0 8 8h16" stroke-width="10"/>
+  </g>
+</svg>

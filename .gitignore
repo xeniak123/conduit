@@ -1,0 +1,11 @@
+node_modules
+dist
+src-tauri/target
+src-tauri/gen/schemas
+coverage
+*.local
+.env
+.DS_Store
+.claude/
+*.key
+src-tauri/installer/*.png

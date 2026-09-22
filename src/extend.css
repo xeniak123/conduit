@@ -1,0 +1,588 @@
+/*
+ * Conduit — companion settings, the store, and the controls they introduced.
+ *
+ * The showcase is the piece that matters. A translucent object cannot be
+ * judged against one background, so the preview lets you put it against four
+ * and watch it work. Everything else here is ordinary list and card layout,
+ * built from the same tokens as the rest of the app.
+ */
+
+/* ---- segmented control ---- */
+
+.seg {
+  display: inline-flex;
+  position: relative;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 999px;
+  background: var(--mat-thin);
+  border: 1px solid var(--edge);
+}
+
+.seg--wide {
+  display: flex;
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.seg--wide .seg__item {
+  flex: 1;
+  justify-content: center;
+}
+
+.seg__item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  white-space: nowrap;
+  transition: color 140ms ease;
+}
+
+.seg--tiny .seg__item {
+  padding: 4px 10px;
+  font-size: 11.5px;
+}
+
+.seg__item > span {
+  position: relative;
+  z-index: 1;
+}
+
+.seg__item[aria-current="true"] {
+  color: var(--action-ink);
+}
+
+.seg__item:hover:not([aria-current="true"]) {
+  color: var(--text);
+}
+
+/* The moving pill is one element travelling, not four fading — so the eye
+   follows the selection instead of losing it and re-finding it. */
+.seg__pill {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--action);
+  box-shadow: 0 1px 4px -1px rgba(0, 0, 0, 0.5);
+}
+
+/* ---- chips ---- */
+
+.chips {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0 16px;
+}
+
+.chips--wrap {
+  flex-wrap: wrap;
+}
+
+.chip {
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: var(--mat-thinner);
+  font-size: 12px;
+  color: var(--text-2);
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+.chip:hover {
+  color: var(--text);
+  border-color: var(--edge-bright);
+}
+
+.chip:active {
+  transform: scale(0.96);
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--action);
+  border-color: transparent;
+  color: var(--action-ink);
+  font-weight: 550;
+}
+
+.tag {
+  margin-left: 7px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  font-size: 10.5px;
+  font-weight: 550;
+  letter-spacing: 0.02em;
+  color: var(--text-3);
+  vertical-align: 1px;
+}
+
+.tag--on {
+  border-color: rgba(88, 201, 160, 0.42);
+  color: var(--good);
+}
+
+.btn--small {
+  padding: 5px 11px;
+  font-size: 12.5px;
+}
+
+/* ---- the showcase ---- */
+
+.showcase {
+  position: relative;
+  height: 220px;
+  margin-bottom: 14px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--edge);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  /* The backdrop is set inline, because it is the thing being switched. */
+}
+
+/*
+ * A faint grid, as in the reference renders. It is not decoration: a regular
+ * pattern behind glass is the only way to see refraction at all, because
+ * refraction is a *distortion of what is behind*, and a flat colour has
+ * nothing to distort.
+ */
+.showcase::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size: 34px 34px;
+  pointer-events: none;
+}
+
+.showcase[data-tone="light"]::before {
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.055) 1px, transparent 1px);
+}
+
+.showcase__scene {
+  height: auto;
+  background: transparent;
+  overflow: visible;
+}
+
+.showcase__tools {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 999px;
+  /* Inside one web view, so a real backdrop blur works here — unlike the
+     companion window, which has an OS boundary between it and the desktop. */
+  background: rgba(14, 14, 19, 0.6);
+  backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.showcase__tools .btn {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f4f3f6;
+}
+
+.showcase__tools .btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.showcase__tools .seg {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.showcase__tools .seg__item {
+  color: rgba(244, 243, 246, 0.72);
+}
+
+/* ---- companion gallery ---- */
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.gallery__card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 14px 8px 11px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--edge);
+  background: var(--mat-thinner);
+  transition:
+    background 160ms ease,
+    transform 200ms cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+.gallery__card:hover {
+  background: var(--mat-thin);
+  transform: translateY(-1px);
+}
+
+.gallery__card:active {
+  transform: scale(0.985);
+}
+
+.gallery__ring {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1.5px solid var(--accent-ring);
+  background: var(--accent-soft);
+}
+
+.gallery__art,
+.gallery__name,
+.gallery__by {
+  position: relative;
+  z-index: 1;
+}
+
+.gallery__art {
+  display: grid;
+  place-items: center;
+  width: 82px;
+  height: 76px;
+  overflow: visible;
+}
+
+/* The gallery uses CompanionBody itself. Its local stage must not reserve a
+   viewport-height box like the independent cursor window does. */
+.gallery__art .companion__row {
+  transform: scale(0.92);
+  transform-origin: center;
+}
+
+.gallery__name {
+  font-size: 12.5px;
+  font-weight: 550;
+  margin-top: 6px;
+}
+
+.gallery__by {
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+
+.gallery__remove {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--text-3);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.gallery__card:hover .gallery__remove {
+  opacity: 1;
+}
+
+.gallery__remove:hover {
+  background: var(--mat-thin);
+  color: var(--live);
+}
+
+.rejected {
+  display: flex;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.rejected code {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--live);
+}
+
+.panel--warn {
+  border-color: rgba(255, 95, 82, 0.3);
+}
+
+.result--warn {
+  border-color: rgba(255, 159, 69, 0.32);
+  color: var(--text-2);
+}
+
+/* ---- the store ---- */
+
+.ext__search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 13px;
+  margin-bottom: 4px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--edge);
+  background: var(--mat-thinner);
+  color: var(--text-3);
+}
+
+.ext__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--text);
+  font: inherit;
+  user-select: text;
+}
+
+.ext__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ext {
+  border-radius: var(--r-md);
+  border: 1px solid var(--edge);
+  background: var(--mat-thinner);
+  overflow: hidden;
+  transition: border-color 160ms ease;
+}
+
+.ext:hover {
+  border-color: var(--edge-bright);
+}
+
+.ext__head {
+  display: flex;
+  gap: 12px;
+  padding: 13px 14px;
+  align-items: flex-start;
+}
+
+.ext__icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 28%;
+  background: var(--plate);
+  border: 1px solid var(--plate-edge);
+  color: var(--text-2);
+}
+
+.ext__icon[data-kind="mcp"] {
+  color: var(--accent);
+}
+.ext__icon[data-kind="skill"] {
+  color: var(--good);
+}
+
+.ext__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ext__name {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.ext__summary {
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.5;
+  margin-top: 1px;
+}
+
+.ext__meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.ext__actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.ext__detail {
+  border-top: 1px solid var(--edge);
+  padding: 12px 14px;
+  overflow: hidden;
+}
+
+.ext__label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+
+/* The command is shown verbatim and selectable. Installing a server means
+   agreeing to run a program; paraphrasing it would make the agreement a
+   formality. */
+.ext__cmd,
+.srv__cmd {
+  display: block;
+  padding: 8px 11px;
+  border-radius: var(--r-sm);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--edge);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.ext__note {
+  margin: 9px 0 0;
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+.ext__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+  font-size: 11.5px;
+  color: var(--text-3);
+  text-decoration: none;
+}
+
+.ext__link:hover {
+  color: var(--text-2);
+}
+
+.ext__empty {
+  padding: 26px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+/* ---- installed servers ---- */
+
+.srv {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--edge);
+}
+
+.srv:last-child {
+  border-bottom: 0;
+}
+
+.srv__row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 9px;
+}
+
+.srv__text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* A shape and a colour, not a colour alone: the state has to survive both a
+   glance and a viewer who does not separate red from green. */
+.srv__dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.srv__dot[data-state="ready"] {
+  background: var(--good);
+  box-shadow: 0 0 8px rgba(88, 201, 160, 0.6);
+}
+
+.srv__dot[data-state="starting"] {
+  background: var(--accent);
+  animation: srv-pulse 1.1s ease-in-out infinite;
+}
+
+.srv__dot[data-state="failed"] {
+  background: var(--live);
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+@keyframes srv-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.srv__key {
+  margin-top: 9px;
+}
+
+.srv__log {
+  margin: 9px 0 0;
+  padding: 9px 11px;
+  max-height: 120px;
+  overflow: auto;
+  border-radius: var(--r-sm);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--edge);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip,
+  .gallery__card {
+    transition: none;
+  }
+  .srv__dot[data-state="starting"] {
+    animation: none;
+  }
+}

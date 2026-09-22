@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "updated": "2026-09-21",
+  "items": [
+    {
+      "id": "mcp-supabase",
+      "kind": "mcp",
+      "name": "Supabase",
+      "summary": "Query tables, run migrations and read logs in your Supabase projects.",
+      "author": "Supabase",
+      "license": "Apache-2.0",
+      "homepage": "https://github.com/supabase-community/supabase-mcp",
+      "tags": ["database", "backend"],
+      "icon": "database",
+      "tint": "mint",
+      "mcp": {
+        "command": "npx",
+        "args": ["-y", "@supabase/mcp-server-supabase@latest", "--read-only"],
+        "env": [
+          {
+            "name": "SUPABASE_ACCESS_TOKEN",
+            "secret": "mcp-supabase",
+            "label": "Supabase access token",
+            "help": "Create one under Account, Access tokens."
+          }
+        ],
+        "note": "Starts read-only. Remove --read-only from the command if you want it to change data."
+      }
+    },
+    {
+      "id": "mcp-notion",
+      "kind": "mcp",
+      "name": "Notion",
+      "summary": "Search, read and write pages and databases in a Notion workspace.",
+      "author": "Notion",
+      "license": "MIT",
+      "homepage": "https://github.com/makenotion/notion-mcp-server",
+      "tags": ["notes", "docs"],
+      "icon": "book",
+      "tint": "ink",
+      "mcp": {
+        "command": "npx",
+        "args": ["-y", "@notionhq/notion-mcp-server"],
+        "env": [
+          {
+            "name": "NOTION_TOKEN",
+            "secret": "mcp-notion",
+            "label": "Notion integration token",
+            "help": "Create an internal integration and share the pages you want it to see."
+          }
+        ]
+      }
+    },
+    {
+      "id": "mcp-everything",
+      "kind": "mcp",
+      "name": "MCP test server",
+      "summary": "Every kind of tool, prompt and resource, for checking that a client works.",
+      "author": "Model Context Protocol",
+      "license": "MIT",
+      "homepage": "https://github.com/modelcontextprotocol/servers",
+      "tags": ["developer", "testing"],
+      "icon": "plug",
+      "tint": "sky",
+      "mcp": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-everything"] }
+    },
+    {
+      "id": "skill-write-tests",
+      "kind": "skill",
+      "name": "Write tests",
+      "summary": "Tests that pin down behaviour, not implementation, and fail for the right reason.",
+      "author": "Conduit community",
+      "license": "MIT",
+      "tags": ["development", "testing"],
+      "icon": "review",
+      "tint": "lime",
+      "files": { "SKILL.md": "skills/write-tests/SKILL.md" }
+    },
+    {
+      "id": "skill-explain-error",
+      "kind": "skill",
+      "name": "Explain an error",
+      "summary": "Turns a stack trace or an error message into what went wrong and what to do.",
+      "author": "Conduit community",
+      "license": "MIT",
+      "tags": ["development"],
+      "icon": "bug",
+      "tint": "rose",
+      "files": { "SKILL.md": "skills/explain-error/SKILL.md" }
+    },
+    {
+      "id": "pet-koi",
+      "kind": "companion",
+      "name": "Koi",
+      "summary": "A small koi that swims in place and blows bubbles when it thinks.",
+      "author": "Conduit community",
+      "license": "MIT",
+      "tags": ["pet"],
+      "icon": "creature",
+      "tint": "ember",
+      "files": { "koi.json": "companions/koi.json" }
+    }
+  ]
+}

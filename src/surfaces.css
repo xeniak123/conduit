@@ -1,0 +1,495 @@
+/*
+ * Conduit — surfaces
+ *
+ * The material layer, kept separate from the token system in styles.css.
+ *
+ * Flat panels on a flat background is what "built in a browser" looks like.
+ * Real materials catch light along their top edge, sit on a ground that is not
+ * perfectly uniform, and cast shadow in proportion to how far they float.
+ * Everything here exists to give the interface those three properties.
+ */
+
+/*
+ * A fine grain over the whole window. Far too subtle to read as texture, but
+ * it breaks up the flat fills — which is what stops large dark areas looking
+ * like dead space instead of a surface.
+ */
+.app::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0.15;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="light"] .app::before {
+  opacity: 0.07;
+}
+
+.composer,
+.modal,
+.palette,
+.hud__card,
+.confirm {
+  position: relative;
+}
+
+/* The line where light lands on a raised surface. */
+.composer::before,
+.modal::before,
+.palette::before,
+.hud__card::before,
+.confirm::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.17) 18%,
+    rgba(255, 255, 255, 0.17) 82%,
+    transparent
+  );
+}
+
+:root[data-theme="light"] .composer::before,
+:root[data-theme="light"] .modal::before,
+:root[data-theme="light"] .palette::before,
+:root[data-theme="light"] .confirm::before {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95) 20%, transparent);
+}
+
+/* Bigger surfaces read as thicker: deeper shadow, layered rather than one blur. */
+.modal,
+.palette {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.42),
+    0 32px 90px -24px rgba(0, 0, 0, 0.92),
+    0 8px 24px -14px rgba(0, 0, 0, 0.6);
+}
+
+/* ============ sidebar additions ============ */
+
+.sidebar__actions {
+  padding: 2px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.newchat {
+  width: 100%;
+  margin: 0;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--r-md);
+  background: var(--mat-thinner);
+  border: 1px solid var(--edge);
+  color: var(--text-3);
+}
+
+.search:focus-within {
+  border-color: var(--edge-bright);
+  color: var(--text-2);
+}
+
+.search__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  user-select: text;
+}
+
+.search__input::placeholder {
+  color: var(--text-3);
+}
+
+.sidebar__empty {
+  padding: 22px 12px;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.footrow--live {
+  margin-bottom: 6px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-ring);
+}
+
+.kbd--dim {
+  margin-left: auto;
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-3);
+  font-size: 10.5px;
+}
+
+/* ============ topbar & status bar ============ */
+
+.topbar__hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: 6px;
+  padding: 5px 9px 5px 10px;
+  border-radius: 100px;
+  border: 1px solid var(--edge);
+  background: var(--mat-thinner);
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.topbar__hint:hover {
+  color: var(--text-2);
+  border-color: var(--edge-bright);
+}
+
+.statusbar {
+  flex: 0 0 auto;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 16px;
+  border-top: 1px solid var(--edge);
+  background: var(--mat-thinner);
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.statusbar b {
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.statusbar__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--good);
+}
+
+.statusbar__dot--busy {
+  background: var(--accent);
+  animation: pulse-soft 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-soft {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.statusbar__sep {
+  width: 1px;
+  height: 11px;
+  background: var(--edge);
+}
+
+/* ============ command palette ============ */
+
+.scrim--top {
+  align-items: flex-start;
+  padding-top: 13vh;
+}
+
+.palette {
+  width: min(620px, 88vw);
+  border-radius: var(--r-lg);
+  background: var(--mat-thick);
+  backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid var(--edge-bright);
+  overflow: hidden;
+}
+
+.palette__field {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--edge);
+  color: var(--text-3);
+}
+
+.palette__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  user-select: text;
+}
+
+.palette__input::placeholder {
+  color: var(--text-3);
+}
+
+.palette__list {
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 7px;
+}
+
+.palette__item {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border-radius: var(--r-sm);
+}
+
+.palette__pill {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-sm);
+  background: var(--mat-thin);
+  border: 1px solid var(--edge);
+}
+
+.palette__row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 11px;
+  color: var(--text-2);
+  font-size: 13.5px;
+}
+
+.palette__item[aria-selected="true"] .palette__row {
+  color: var(--text);
+}
+
+.palette__label {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette__hint {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.palette__empty {
+  padding: 26px;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+/* ============ markdown ============ */
+
+.md > *:first-child {
+  margin-top: 0;
+}
+
+.md > *:last-child {
+  margin-bottom: 0;
+}
+
+.md__p {
+  margin: 0 0 11px;
+  white-space: pre-wrap;
+}
+
+.md__h {
+  margin: 18px 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+}
+
+.md__list {
+  margin: 0 0 11px;
+  padding-left: 20px;
+}
+
+.md__list li {
+  margin-bottom: 4px;
+}
+
+.md__list li::marker {
+  color: var(--text-3);
+}
+
+.md__quote {
+  margin: 0 0 11px;
+  padding: 2px 0 2px 13px;
+  border-left: 2px solid var(--accent-ring);
+  color: var(--text-2);
+}
+
+.md__code {
+  padding: 1.5px 5px;
+  border-radius: 5px;
+  background: var(--mat-thin);
+  border: 1px solid var(--edge);
+  font-family: var(--mono);
+  font-size: 0.87em;
+}
+
+.md__link {
+  color: var(--accent);
+  text-underline-offset: 2px;
+}
+
+.code {
+  margin: 0 0 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--edge);
+  background: rgba(0, 0, 0, 0.34);
+  overflow: hidden;
+}
+
+:root[data-theme="light"] .code {
+  background: rgba(10, 8, 20, 0.035);
+}
+
+.code__bar {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px 6px 13px;
+  border-bottom: 1px solid var(--edge);
+  background: var(--mat-thinner);
+}
+
+.code__lang {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.code__copy {
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.code__copy:hover {
+  background: var(--mat-thin);
+  color: var(--text);
+}
+
+.code__body {
+  margin: 0;
+  padding: 13px 15px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  user-select: text;
+}
+
+/* ============ message surface ============ */
+
+.bubble {
+  /* A raised edge on the user's own words, so the two voices read as
+     different materials rather than only different alignments. */
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 6px 20px -15px rgba(0, 0, 0, 0.9);
+}
+
+:root[data-theme="light"] .bubble {
+  background: linear-gradient(160deg, rgba(10, 8, 20, 0.05), rgba(10, 8, 20, 0.028));
+  box-shadow: 0 6px 18px -16px rgba(0, 0, 0, 0.5);
+}
+
+.assistant__mark {
+  position: relative;
+  overflow: hidden;
+}
+
+/* A slow sheen across the mark while a reply is still being written. */
+.msg--pending .assistant__mark::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.5), transparent 65%);
+  animation: sheen 1.5s linear infinite;
+}
+
+@keyframes sheen {
+  from {
+    transform: translateX(-130%);
+  }
+  to {
+    transform: translateX(130%);
+  }
+}
+
+.activity {
+  background: linear-gradient(180deg, var(--mat-thin), var(--mat-thinner));
+}
+
+.suggestion {
+  transition:
+    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.suggestion:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px -22px rgba(0, 0, 0, 0.95);
+}
+
+/* Large display text fades toward its baseline, the way set metal catches
+   less light at the bottom of a letterform. */
+.welcome__title {
+  background: linear-gradient(180deg, var(--text), rgba(242, 241, 244, 0.6));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+:root[data-theme="light"] .welcome__title {
+  background: linear-gradient(180deg, var(--text), rgba(21, 20, 26, 0.58));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .palette {
+    backdrop-filter: none;
+    background: var(--bg-1);
+  }
+  .app::before {
+    display: none;
+  }
+}

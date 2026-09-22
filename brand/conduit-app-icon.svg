@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Conduit">
+  <title>Conduit</title>
+  <desc>The Conduit mark on its plate: the application icon.</desc>
+  <!--
+    The plate carries a faint top-edge highlight — the light a physical surface
+    would catch. It is the only gradient in the identity, and it is describing
+    a material rather than decorating one.
+  -->
+  <defs>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#24242b"/>
+      <stop offset="0.42" stop-color="#16161a"/>
+      <stop offset="1" stop-color="#121216"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="113" fill="url(#plate)"/>
+  <rect x="0.5" y="0.5" width="511" height="511" rx="112.5" fill="none"
+        stroke="#ffffff" stroke-opacity="0.08"/>
+
+  <g transform="translate(256 256) scale(5.12) translate(-50 -50)"
+     fill="none" stroke="#fffefc" stroke-linecap="round">
+    <path d="M58 18H34a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h24" stroke-width="12"/>
+    <path d="M64 40H48a8 8 0 0 0-8 8v4a8 8 0 0 0 8 8h16" stroke-width="10"/>
+  </g>
+</svg>

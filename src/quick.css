@@ -1,0 +1,132 @@
+/*
+ * Quick capture.
+ *
+ * A single floating surface over whatever the user was doing. It has no
+ * chrome, no sidebar and no history — the discipline is that it must never
+ * grow into a second version of the main window.
+ */
+
+.quick {
+  height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10px;
+}
+
+.quick__shell {
+  width: 100%;
+  border-radius: var(--r-xl);
+  /*
+   * Opaque, deliberately.
+   *
+   * `backdrop-filter` only blurs what is inside the same web view — it cannot
+   * reach across an OS window boundary. A translucent surface floating over
+   * another application therefore gets no blur at all, just whatever is behind
+   * it showing through at full detail, and the text becomes unreadable the
+   * moment it lands over anything busy. Frosted glass here is a lie the
+   * platform will not tell for us.
+   */
+  background: #131317;
+  border: 1px solid var(--edge-bright);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.42),
+    0 30px 80px -26px rgba(0, 0, 0, 0.95);
+  overflow: hidden;
+}
+
+.quick__field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 16px;
+}
+
+.quick__mark {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 28%;
+  background: var(--plate);
+  border: 1px solid var(--plate-edge);
+  color: #fffefc;
+}
+
+.quick__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  resize: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.4;
+  max-height: 120px;
+  user-select: text;
+}
+
+.quick__input::placeholder {
+  color: var(--text-3);
+}
+
+.quick__list {
+  border-top: 1px solid var(--edge);
+  padding: 6px;
+  overflow: hidden;
+}
+
+.quick__prompt {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  text-align: left;
+  color: var(--text-2);
+  font-size: 13.5px;
+}
+
+.quick__prompt code {
+  min-width: 76px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.quick__prompt[aria-selected="true"],
+.quick__prompt:hover {
+  background: var(--mat-thin);
+  color: var(--text);
+}
+
+.quick__answer {
+  border-top: 1px solid var(--edge);
+  padding: 14px 16px;
+  font-size: 14px;
+  max-height: 340px;
+  overflow-y: auto;
+  user-select: text;
+}
+
+.quick__answer--bad {
+  color: var(--live);
+}
+
+.quick__actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.quick__foot {
+  display: flex;
+  gap: 16px;
+  padding: 0 16px 13px;
+  font-size: 11.5px;
+  color: var(--text-3);
+}

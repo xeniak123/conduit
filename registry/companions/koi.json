@@ -1,0 +1,123 @@
+{
+  "id": "koi",
+  "name": "Koi",
+  "kind": "pet",
+  "author": "Conduit community",
+  "version": "1.0.0",
+  "license": "MIT",
+  "description": "A small koi. Swims in place, blows bubbles when it thinks.",
+  "viewBox": "0 0 100 100",
+  "palette": { "body": "#ff7a3d", "belly": "#fff1e6", "spot": "#ffffff", "ink": "#2b2230", "fin": "#ff9a66" },
+  "parts": [
+    {
+      "id": "shadow",
+      "origin": [50, 94],
+      "shapes": [{ "kind": "ellipse", "cx": 50, "cy": 94, "rx": 22, "ry": 3, "fill": "#000000", "opacity": 0.14 }]
+    },
+    {
+      "id": "tail",
+      "origin": [26, 62],
+      "shapes": [
+        { "kind": "path", "d": "M28 62 C18 52 10 50 8 54 C12 60 12 64 8 70 C10 74 18 72 28 62 Z", "fill": "token:fin", "stroke": "token:body", "width": 1.2 }
+      ]
+    },
+    {
+      "id": "body",
+      "origin": [50, 64],
+      "shapes": [
+        { "kind": "path", "d": "M26 62 C30 46 46 40 60 42 C74 44 82 54 82 62 C82 70 74 80 60 82 C46 84 30 78 26 62 Z", "fill": "token:body" },
+        { "kind": "path", "d": "M34 70 C44 78 60 80 72 74 C66 80 50 84 40 78 Z", "fill": "token:belly", "opacity": 0.9 },
+        { "kind": "ellipse", "cx": 48, "cy": 52, "rx": 7, "ry": 4.5, "fill": "token:spot", "opacity": 0.85 },
+        { "kind": "ellipse", "cx": 62, "cy": 50, "rx": 4, "ry": 3, "fill": "token:spot", "opacity": 0.85 }
+      ]
+    },
+    {
+      "id": "fin",
+      "origin": [52, 70],
+      "shapes": [{ "kind": "path", "d": "M50 70 C54 78 58 82 62 80 C60 76 58 72 56 70 Z", "fill": "token:fin" }]
+    },
+    {
+      "id": "eye",
+      "origin": [72, 58],
+      "shapes": [
+        { "kind": "circle", "cx": 72, "cy": 58, "r": 4, "fill": "token:ink" },
+        { "kind": "circle", "cx": 73.3, "cy": 56.6, "r": 1.4, "fill": "#ffffff" }
+      ]
+    },
+    {
+      "id": "mouth",
+      "origin": [80, 64],
+      "shapes": [{ "kind": "path", "d": "M78 64 Q80 66 82 64", "stroke": "token:ink", "width": 1.4, "cap": "round" }]
+    },
+    {
+      "id": "bubbles",
+      "origin": [84, 44],
+      "showIn": ["thinking", "working", "coding", "searching"],
+      "shapes": [
+        { "kind": "circle", "cx": 84, "cy": 50, "r": 2.4, "fill": "#bfe6ff", "stroke": "#6bb8e8", "width": 0.8 },
+        { "kind": "circle", "cx": 88, "cy": 40, "r": 3.2, "fill": "#bfe6ff", "stroke": "#6bb8e8", "width": 0.8 },
+        { "kind": "circle", "cx": 84, "cy": 29, "r": 4, "fill": "#bfe6ff", "stroke": "#6bb8e8", "width": 0.8 }
+      ]
+    }
+  ],
+  "states": {
+    "idle": {
+      "loop": 2.6,
+      "tracks": {
+        "body": [{ "t": 0, "y": 0 }, { "t": 0.5, "y": -2 }, { "t": 1, "y": 0 }],
+        "tail": [{ "t": 0, "r": -10, "y": 0 }, { "t": 0.5, "r": 10, "y": -2 }, { "t": 1, "r": -10, "y": 0 }],
+        "fin": [{ "t": 0, "r": 0, "y": 0 }, { "t": 0.5, "r": 14, "y": -2 }, { "t": 1, "r": 0, "y": 0 }],
+        "eye": [{ "t": 0, "y": 0 }, { "t": 0.5, "y": -2 }, { "t": 1, "y": 0 }],
+        "mouth": [{ "t": 0, "y": 0 }, { "t": 0.5, "y": -2 }, { "t": 1, "y": 0 }]
+      }
+    },
+    "walking": {
+      "loop": 0.6,
+      "tracks": {
+        "tail": [{ "t": 0, "r": -20 }, { "t": 0.5, "r": 20 }, { "t": 1, "r": -20 }],
+        "body": [{ "t": 0, "r": -2 }, { "t": 0.5, "r": 2 }, { "t": 1, "r": -2 }],
+        "fin": [{ "t": 0, "r": -10 }, { "t": 0.5, "r": 16 }, { "t": 1, "r": -10 }]
+      }
+    },
+    "thinking": {
+      "loop": 1.8,
+      "tracks": {
+        "tail": [{ "t": 0, "r": -6 }, { "t": 0.5, "r": 6 }, { "t": 1, "r": -6 }],
+        "bubbles": [
+          { "t": 0, "y": 8, "o": 0, "s": 0.6, "ease": "linear" },
+          { "t": 0.3, "y": 2, "o": 1, "s": 1 },
+          { "t": 1, "y": -8, "o": 0, "s": 1.1, "ease": "linear" }
+        ]
+      }
+    },
+    "working": {
+      "loop": 0.8,
+      "tracks": {
+        "tail": [{ "t": 0, "r": -16 }, { "t": 0.5, "r": 16 }, { "t": 1, "r": -16 }],
+        "bubbles": [
+          { "t": 0, "y": 8, "o": 0, "s": 0.6, "ease": "linear" },
+          { "t": 0.3, "y": 2, "o": 1, "s": 1 },
+          { "t": 1, "y": -8, "o": 0, "s": 1.1, "ease": "linear" }
+        ]
+      }
+    },
+    "done": {
+      "loop": 1.4,
+      "tracks": {
+        "body": [{ "t": 0, "y": 0, "r": 0 }, { "t": 0.3, "y": -12, "r": -12, "ease": "out" }, { "t": 0.6, "y": 0, "r": 0, "ease": "in" }, { "t": 1, "y": 0 }],
+        "tail": [{ "t": 0, "y": 0 }, { "t": 0.3, "y": -12, "r": 20, "ease": "out" }, { "t": 0.6, "y": 0, "ease": "in" }, { "t": 1, "y": 0 }],
+        "fin": [{ "t": 0, "y": 0 }, { "t": 0.3, "y": -12, "ease": "out" }, { "t": 0.6, "y": 0, "ease": "in" }, { "t": 1, "y": 0 }],
+        "eye": [{ "t": 0, "y": 0 }, { "t": 0.3, "y": -12, "ease": "out" }, { "t": 0.6, "y": 0, "ease": "in" }, { "t": 1, "y": 0 }],
+        "mouth": [{ "t": 0, "y": 0 }, { "t": 0.3, "y": -12, "ease": "out" }, { "t": 0.6, "y": 0, "ease": "in" }, { "t": 1, "y": 0 }]
+      }
+    },
+    "sleeping": {
+      "loop": 5,
+      "tracks": {
+        "body": [{ "t": 0, "y": 2 }, { "t": 0.5, "y": 1 }, { "t": 1, "y": 2 }],
+        "eye": [{ "t": 0, "sy": 0.12, "y": 2 }],
+        "tail": [{ "t": 0, "r": -4, "y": 2 }, { "t": 0.5, "r": 4, "y": 1 }, { "t": 1, "r": -4, "y": 2 }]
+      }
+    }
+  }
+}
