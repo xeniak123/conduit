@@ -1,6 +1,6 @@
 {
   "name": "conduit",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "type": "module",
   "description": "A desktop agent that lives in your tray: speak or type, and it reads files, runs commands, and operates your screen.",
   "scripts": {

@@ -371,15 +371,26 @@ export function archivesFor(release: Release, os: string, backend: Backend) {
   if (!patterns) return null;
   let main: Release["assets"][number] | undefined;
   for (const pattern of patterns) {
-    main = release.assets.find((a) => pattern.test(a.name));
+    // Only the server archives themselves: the CUDA runtime is published as
+    // "cudart-llama-bin-win-cuda-12.4-x64.zip", which matches the same
+    // pattern and sorts first, and taking it meant llama-server never arrived.
+    main = release.assets.find((a) => a.name.startsWith("llama-") && pattern.test(a.name));
     if (main) break;
   }
   if (!main) return null;
   const list = [main];
   if (backend === "cuda") {
     const version = /cuda-(\d+\.\d+)/.exec(main.name)?.[1];
+    // Same system and same archive type as the server: Linux runtimes are
+    // published alongside and must never be unpacked into a Windows install.
+    const platform = main.name.includes("-win-") ? "-win-" : "-ubuntu-";
+    const ext = main.name.endsWith(".zip") ? ".zip" : ".tar.gz";
     const cudart = release.assets.find(
-      (a) => a.name.startsWith("cudart-") && version && a.name.includes(`cuda-${version}-x64`),
+      (a) =>
+        a.name.startsWith("cudart-") &&
+        a.name.includes(platform) &&
+        version !== undefined &&
+        a.name.endsWith(`cuda-${version}-x64${ext}`),
     );
     if (cudart) list.push(cudart);
   }
@@ -455,7 +466,12 @@ export async function installRuntime(backend: Backend): Promise<string> {
   }
 
   const binary = machine.os === "windows" ? "llama-server.exe" : "llama-server";
-  const path = await invoke<string>("find_file", { root: dir, name: binary });
+  const path = await invoke<string>("find_file", { root: dir, name: binary }).catch(async () => {
+    // A half-installed folder would fail the same way on every retry, so it
+    // goes, and the next attempt starts from nothing.
+    await invoke("fs_remove", { path: dir }).catch(() => undefined);
+    throw new Error("llama.cpp downloaded, but the server program was not in it. Press Install to try again.");
+  });
   if (machine.os !== "windows") {
     await invoke("run_command", { command: `chmod +x "${path}"`, cwd: null }).catch(() => undefined);
   }

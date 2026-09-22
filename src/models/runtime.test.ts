@@ -17,10 +17,14 @@ const release = {
 describe("llama.cpp archives", () => {
   it("finds a Windows build for every backend, with the CUDA runtime", () => {
     const cuda = archivesFor(release, "windows", "cuda")!.map((a) => a.name);
-    expect(cuda[0]).toMatch(/win-cuda-12\.\d+-x64\.zip$/);
-    expect(cuda.some((n) => n.startsWith("cudart-"))).toBe(true);
-    expect(archivesFor(release, "windows", "vulkan")).not.toBeNull();
-    expect(archivesFor(release, "windows", "cpu")).not.toBeNull();
+    // The server archive first, then the separate CUDA runtime. Taking the
+    // runtime twice is how llama-server once never got installed.
+    expect(cuda).toHaveLength(2);
+    expect(cuda[0]).toMatch(/^llama-b\d+-bin-win-cuda-12\.\d+-x64\.zip$/);
+    expect(cuda[1]).toMatch(/^cudart-llama-bin-win-cuda-12\.\d+-x64\.zip$/);
+    for (const backend of ["vulkan", "cpu"] as const) {
+      expect(archivesFor(release, "windows", backend)![0].name).toMatch(/^llama-b\d+-bin-win-/);
+    }
   });
 
   it("finds the macOS and Linux builds", () => {
