@@ -617,13 +617,26 @@ async function unregisterProvider(): Promise<void> {
   const next = {
     ...settings,
     customProviders: settings.customProviders.filter((p) => p.id !== LOCAL_PROVIDER),
-    command:
-      settings.command.provider === LOCAL_PROVIDER
-        ? { provider: "anthropic", model: "claude-opus-5" }
-        : settings.command,
+    // Back to whatever chat used before the local model took over, rather than
+    // a model the user may have no key for.
+    command: settings.command.provider === LOCAL_PROVIDER ? previousCommand() : settings.command,
   };
   useApp.getState().setSettings(next);
   await saveSettings(next);
+}
+
+const BEFORE_LOCAL = "conduit.command.beforeLocal";
+
+function previousCommand(): { provider: string; model: string } {
+  try {
+    const saved = JSON.parse(localStorage.getItem(BEFORE_LOCAL) ?? "null") as { provider?: string; model?: string } | null;
+    if (saved?.provider && saved.model && saved.provider !== LOCAL_PROVIDER) {
+      return { provider: saved.provider, model: saved.model };
+    }
+  } catch {
+    /* fall through to the default */
+  }
+  return { provider: "anthropic", model: "claude-opus-5" };
 }
 
 /** Points chat at the loaded model. */
@@ -631,6 +644,13 @@ export async function useInChat(): Promise<void> {
   const loaded = useRuntime.getState().loaded;
   if (!loaded) return;
   const settings = getSettings();
+  if (settings.command.provider !== LOCAL_PROVIDER) {
+    try {
+      localStorage.setItem(BEFORE_LOCAL, JSON.stringify(settings.command));
+    } catch {
+      /* unloading then falls back to the default model */
+    }
+  }
   const next = { ...settings, command: { provider: LOCAL_PROVIDER, model: loaded.name } };
   useApp.getState().setSettings(next);
   await saveSettings(next);

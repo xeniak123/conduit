@@ -20,6 +20,7 @@ import { ScheduledPage } from "./ScheduledPage";
 import { AgentsPage } from "./AgentsPage";
 import { DecidePage } from "./DecidePage";
 import { ArenaPage } from "./ArenaPage";
+import { TunePage } from "./TunePage";
 import { StorePage } from "./StorePage";
 import { Settings } from "./Settings";
 import { Sidebar } from "./Sidebar";
@@ -141,6 +142,7 @@ export function Shell() {
             {page === "agents" && <AgentsPage />}
             {page === "decide" && <DecidePage />}
             {page === "arena" && <ArenaPage />}
+            {page === "tune" && <TunePage />}
           </motion.main>
         </AnimatePresence>
 

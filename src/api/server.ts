@@ -106,17 +106,24 @@ export function keepApiInSync(): () => void {
       }
       return;
     }
-    const next = JSON.stringify([settings.api, routes(settings)]);
+    // Which tokens are still valid is part of the signature, so one that
+    // expires while the server is running stops working within a minute
+    // instead of at the next restart.
+    const now = Date.now();
+    const live = settings.api.tokens.filter((t) => !t.expires || t.expires > now).map((t) => t.id);
+    const next = JSON.stringify([settings.api, routes(settings), live]);
     if (next === signature) return;
     signature = next;
     void startApi().catch((e) => console.error("[conduit] API", e));
   };
   const offApp = useApp.subscribe(check);
   const offRuntime = useRuntime.subscribe(check);
+  const timer = window.setInterval(check, 60_000);
   check();
   return () => {
     offApp();
     offRuntime();
+    window.clearInterval(timer);
   };
 }
 

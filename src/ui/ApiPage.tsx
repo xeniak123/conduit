@@ -213,8 +213,8 @@ export function ApiPage() {
 
       <section className="block">
         <h3 className="block__title">Let an app connect itself</h3>
-        <div className="card">
-          <p className="muted">
+        <div className="grantdoc">
+          <p className="block__sub">
             Instead of asking people to paste a token, another program can send them here and be granted one — the
             same handshake OpenRouter and ChatGPT use. Conduit asks in its own window, the program never sees a
             password, and what it gets is an ordinary token you can revoke above.
@@ -226,7 +226,7 @@ export function ApiPage() {
             </button>
             <pre>{grantSample}</pre>
           </div>
-          <p className="muted">
+          <p className="block__sub">
             The code is worth nothing without the verifier behind the challenge, it can be spent once, and it expires
             in ten minutes. Conduit sends it back only to this machine or to the program's own URL scheme.
           </p>
@@ -312,7 +312,8 @@ export function ApiPage() {
 function grantFlow(base: string): string {
   const root = base.replace(/\/v1$/, "");
   return [
-    "# 1. Send the user's browser here (challenge = base64url(sha256(verifier)))",
+    "# 1. Send the user's browser here.",
+    "#    CHALLENGE = base64url(sha256(VERIFIER))",
     `${root}/oauth/authorize?client_name=Your%20App&redirect_uri=http://localhost:7777/cb`,
     "  &code_challenge=$CHALLENGE&code_challenge_method=S256&state=$STATE",
     "",

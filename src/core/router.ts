@@ -77,9 +77,14 @@ export async function route(text: string, settings: Settings, attachments = 0): 
 }
 
 /** What the strong model would have cost for the same tokens, minus what was paid. */
-export function saved(strong: string, used: string, input: number, output: number): number | null {
-  const would = costOf(strong, input, output);
-  const did = costOf(used, input, output) ?? 0;
+export function saved(
+  strong: { provider: string; model: string },
+  used: { provider: string; model: string },
+  input: number,
+  output: number,
+): number | null {
+  const would = costOf(strong.model, input, output, strong.provider);
+  const did = costOf(used.model, input, output, used.provider) ?? 0;
   if (would === null) return null;
   return Math.max(0, would - did);
 }

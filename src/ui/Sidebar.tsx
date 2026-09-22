@@ -22,6 +22,7 @@ const MORE: Array<{ page: Page; label: string; icon: keyof typeof Icon }> = [
   { page: "scheduled", label: "Scheduled", icon: "clock" },
   { page: "agents", label: "Agents", icon: "terminal" },
   { page: "decide", label: "Decisions", icon: "bolt" },
+  { page: "tune", label: "Fine-tune", icon: "brain" },
   { page: "store", label: "Store", icon: "store" },
   { page: "companion", label: "Companion", icon: "sparkle" },
   { page: "api", label: "API", icon: "globe" },
@@ -83,7 +84,7 @@ export function Sidebar() {
           <span className="nav__mark">
             <Logo size={16} />
           </span>
-          Conduit
+          <span className="nav__name">Conduit</span>
         </span>
         <button
           className="nav__icon"
@@ -137,10 +138,16 @@ export function Sidebar() {
             onSelect={() => setPage(item.page)}
           />
         ))}
-        <button className="navitem navmore" aria-expanded={moreOpen} onPointerDown={() => toggleMore()}>
+        <button
+          className="navitem navmore"
+          aria-expanded={moreOpen}
+          aria-label={moreOpen ? "Show fewer pages" : "Show more pages"}
+          title={moreOpen ? "Less" : "More"}
+          onPointerDown={() => toggleMore()}
+        >
           <span className="navitem__row">
             <Icon.chevron />
-            {moreOpen ? "Less" : "More"}
+            <span className="navitem__label">{moreOpen ? "Less" : "More"}</span>
             {!moreOpen && inMore && <span className="navitem__live" aria-label="The open page is in here" />}
           </span>
         </button>
@@ -207,7 +214,12 @@ export function Sidebar() {
       </div>
 
       <div className="nav__foot">
-        <button className="me me--btn" onPointerDown={() => setAccountOpen(true)}>
+        <button
+          className="me me--btn"
+          aria-label={account ? "Account" : "Sign in"}
+          title={account ? account.user.email : "Sign in"}
+          onPointerDown={() => setAccountOpen(true)}
+        >
           <span className="me__avatar">
             {account ? account.user.email.slice(0, 1).toUpperCase() : <Logo size={14} />}
           </span>
@@ -242,11 +254,11 @@ function NavItem({
 }) {
   const Glyph = Icon[icon];
   return (
-    <button className="navitem" aria-current={active} onPointerDown={onSelect}>
+    <button className="navitem" aria-current={active} aria-label={label} title={label} onPointerDown={onSelect}>
       {active && <motion.span layoutId="nav-pill" className="navitem__pill" transition={SPRING} />}
       <span className="navitem__row">
         <Glyph />
-        {label}
+        <span className="navitem__label">{label}</span>
         {badge && <span className="navitem__live" aria-label="A model is running" />}
         {hint && <span className="navitem__hint">{hint}</span>}
       </span>

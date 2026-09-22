@@ -4,6 +4,7 @@ import { setComputerUseEnabled } from "@/computer";
 import { saveSettings } from "@/core/config";
 import { contenders } from "@/core/arena";
 import { runTask } from "@/core/schedule";
+import { applyTheme } from "@/core/theme";
 import { useApp, type Page } from "@/core/store";
 import { Icon } from "./icons";
 import { SPRING, SPRING_SNAP } from "./motion";
@@ -78,12 +79,14 @@ export function CommandPalette() {
       {
         id: "theme",
         group: "Actions",
-        label: s.appearance.theme === "dark" ? "Switch to light" : "Switch to dark",
+        // What is on screen, not what is saved: with "system" saved, the
+        // label used to offer dark while the app was already dark.
+        label: document.documentElement.dataset.theme === "dark" ? "Switch to light" : "Switch to dark",
         icon: "sparkle",
         run: () => {
-          const theme: "dark" | "light" = s.appearance.theme === "dark" ? "light" : "dark";
+          const theme: "dark" | "light" = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
           save({ ...s, appearance: { ...s.appearance, theme } });
-          document.documentElement.dataset.theme = theme;
+          applyTheme(theme);
         },
       },
     ];
@@ -91,6 +94,7 @@ export function CommandPalette() {
     const pages: Array<[Page, string, keyof typeof Icon]> = [
       ["models", "Model hub", "grid"],
       ["arena", "Arena", "chart"],
+      ["tune", "Fine-tune", "brain"],
       ["projects", "Projects", "folder"],
       ["scheduled", "Scheduled", "clock"],
       ["agents", "Agents", "terminal"],

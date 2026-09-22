@@ -84,7 +84,7 @@ export async function ask(
     text = result.text || text;
     const input = result.usage?.input ?? 0;
     const output = result.usage?.output ?? 0;
-    const cost = costOf(c.model, input, output);
+    const cost = costOf(c.model, input, output, c.provider);
     recordUsage({ at: Date.now(), model: c.model, input, output, cost });
     const final: Answer = {
       text,

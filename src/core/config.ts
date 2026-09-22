@@ -332,8 +332,10 @@ export const DEFAULT_SETTINGS: Settings = {
   stt: { provider: "groq", language: "" },
   command: { provider: "anthropic", model: "claude-opus-5" },
   dictation: {
+    // Cleanup runs on every dictated phrase and the user is waiting on it, so
+    // the default is the fast model, not the strongest one.
     provider: "anthropic",
-    model: "claude-opus-5",
+    model: "claude-haiku-4-5",
     polish: true,
     delivery: "paste",
   },

@@ -144,12 +144,31 @@ fn random_id() -> String {
 /// control.
 pub fn redirect_allowed(redirect: &str) -> bool {
     if let Some(rest) = redirect.strip_prefix("http://") {
-        let host = rest.split(['/', ':']).next().unwrap_or("");
+        let host = rest.split(['/', ':', '?', '#']).next().unwrap_or("");
         return host == "127.0.0.1" || host == "localhost" || host == "[::1]";
     }
     // A custom scheme (myapp://done) goes to whatever registered it, which is
-    // the program itself. Anything over http(s) to the internet does not.
-    !redirect.starts_with("https://") && redirect.contains("://") && !redirect.contains(' ')
+    // the program itself. The browser's own schemes do not: `javascript:` in
+    // particular would run in the page Conduit serves on loopback.
+    let Some((scheme, _)) = redirect.split_once("://") else { return false };
+    let scheme = scheme.to_ascii_lowercase();
+    const BROWSER: &[&str] =
+        &["http", "https", "javascript", "data", "vbscript", "file", "about", "blob", "ftp", "ws", "wss", "chrome", "edge"];
+    !scheme.is_empty()
+        && scheme.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
+        && scheme.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+        && !BROWSER.contains(&scheme.as_str())
+        && !redirect.chars().any(|c| c.is_whitespace() || c.is_control())
+}
+
+/// The program chooses its own name, so it is text, never markup.
+fn escape_html(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }
 
 /// Records a program's request and returns the id the window will decide on.
@@ -229,6 +248,7 @@ pub fn exchange(code: &str, verifier: &str) -> Result<String, String> {
 
 /// The page the browser sits on while the user decides in Conduit's window.
 pub fn waiting_page(id: &str, client: &str, port: u16) -> String {
+    let client = escape_html(client);
     format!(
         r#"<!doctype html><meta charset="utf-8"><title>Authorize {client}</title>
 <style>
@@ -285,6 +305,12 @@ mod tests {
         assert!(!redirect_allowed("https://evil.example.com/steal"));
         assert!(!redirect_allowed("http://evil.example.com/steal"));
         assert!(!redirect_allowed("not a url"));
+        // Browser schemes would run script in the page Conduit serves.
+        assert!(!redirect_allowed("javascript://%0aalert(1)"));
+        assert!(!redirect_allowed("JavaScript://x"));
+        assert!(!redirect_allowed("data://text/html,hi"));
+        assert!(!redirect_allowed("http://127.0.0.1@evil.example.com/cb"));
+        assert!(redirect_allowed("http://127.0.0.1:9/cb?x=1"));
     }
 
     #[test]
@@ -297,6 +323,13 @@ mod tests {
         assert_eq!(exchange(&code, verifier).unwrap(), "cnd_secret");
         // Spent: a replay gets nothing.
         assert!(exchange(&code, verifier).is_err());
+    }
+
+    #[test]
+    fn a_program_name_cannot_become_markup() {
+        let page = waiting_page("abc", "<script>alert(1)</script>", 8888);
+        assert!(!page.contains("<script>alert(1)"));
+        assert!(page.contains("&lt;script&gt;"));
     }
 
     #[test]

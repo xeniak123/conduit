@@ -163,7 +163,7 @@ export async function runAgent(
     if (response.usage) {
       usage.input += response.usage.input;
       usage.output += response.usage.output;
-      const cost = costOf(command.model, response.usage.input, response.usage.output);
+      const cost = costOf(command.model, response.usage.input, response.usage.output, command.provider);
       usage.cost += cost ?? 0;
       recordUsage({
         at: Date.now(),
@@ -258,7 +258,7 @@ export async function runAgent(
       if (result.usage) {
         usage.input += result.usage.input;
         usage.output += result.usage.output;
-        usage.cost += costOf(command.model, result.usage.input, result.usage.output) ?? 0;
+        usage.cost += costOf(command.model, result.usage.input, result.usage.output, command.provider) ?? 0;
       }
       return result.text.trim();
     } catch {

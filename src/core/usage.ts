@@ -19,8 +19,12 @@ export interface Price {
 
 const PRICES: Record<string, Price> = {
   // Anthropic
+  "claude-fable-5-1": { input: 10, output: 50 },
+  "claude-fable-5": { input: 10, output: 50 },
   "claude-opus-5": { input: 5, output: 25 },
+  "claude-opus-4-8": { input: 5, output: 25 },
   "claude-sonnet-5": { input: 2, output: 10 },
+  "claude-sonnet-4-6": { input: 3, output: 15 },
   "claude-haiku-4-5": { input: 1, output: 5 },
   // OpenAI
   "gpt-5": { input: 1.25, output: 10 },
@@ -30,11 +34,18 @@ const PRICES: Record<string, Price> = {
   "gemini-2.5-flash": { input: 0.3, output: 2.5 },
 };
 
-/** Anything self-hosted costs nothing per token; only electricity. */
-const FREE = ["ollama", "llama", "qwen", "mistral", "local"];
+/**
+ * Providers that run on this machine: nothing per token, only electricity.
+ *
+ * Decided by where the model runs, never by its name. Guessing from the name
+ * priced every Qwen, Llama and Mistral model on OpenRouter at zero, so the
+ * usage page and the daily budget quietly ignored real spending.
+ */
+const LOCAL_PROVIDERS = ["local", "ollama", "lmstudio", "llamacpp"];
 
-export function priceFor(model: string): Price | null {
-  if (FREE.some((f) => model.toLowerCase().includes(f))) return { input: 0, output: 0 };
+export function priceFor(model: string, provider?: string): Price | null {
+  if (provider && LOCAL_PROVIDERS.includes(provider)) return { input: 0, output: 0 };
+  if (model.startsWith("local/")) return { input: 0, output: 0 };
 
   const exact = PRICES[model];
   if (exact) return exact;
@@ -44,8 +55,8 @@ export function priceFor(model: string): Price | null {
   return PRICES[bare] ?? null;
 }
 
-export function costOf(model: string, input: number, output: number): number | null {
-  const price = priceFor(model);
+export function costOf(model: string, input: number, output: number, provider?: string): number | null {
+  const price = priceFor(model, provider);
   if (!price) return null;
   return (input * price.input + output * price.output) / 1_000_000;
 }

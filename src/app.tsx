@@ -7,7 +7,8 @@ import { flush, loadConversations, persistConversations } from "@/core/history";
 import { refreshKeyStatus } from "@/core/secrets";
 import { isTauri } from "@/core/host";
 import { installNativeShell, revealWindow } from "@/core/nativeShell";
-import { applyTheme } from "@/core/theme";
+import { applyCachedTheme, applyTheme } from "@/core/theme";
+import { installKeyboardActivation } from "@/core/a11y";
 import { startCompanionBridge } from "@/core/companion";
 import { syncServers } from "@/mcp";
 import { loadSkills } from "@/skills";
@@ -25,6 +26,11 @@ import { Cursor } from "@/ui/Cursor";
 import { Pet } from "@/ui/Pet";
 import { Quick } from "@/ui/Quick";
 import { Shell } from "@/ui/Shell";
+
+// Before the first paint, not after settings load: see applyCachedTheme.
+applyCachedTheme();
+// Every window, and for the whole session: see a11y.ts.
+installKeyboardActivation();
 
 /**
  * Four windows share one bundle, chosen by hash.

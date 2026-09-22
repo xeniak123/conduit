@@ -894,7 +894,7 @@ export function Monogram({ name, large, repo }: { name: string; large?: boolean;
   if (family) return <BrandMark brand={family} size={large ? 52 : 38} badge={repo ? "huggingface" : null} />;
   return (
     <span
-      className={`mono${large ? " mono--lg" : ""}`}
+      className={`monogram${large ? " monogram--lg" : ""}`}
       style={{ ["--h" as string]: String(hue) }}
       aria-hidden="true"
     >

@@ -3,7 +3,7 @@ import type { AgentStep } from "./agent";
 import { DEFAULT_SETTINGS, type Settings } from "./config";
 
 /** The main window's pages. Chat is one of them, not the whole app. */
-export type Page = "chat" | "models" | "store" | "projects" | "companion" | "api" | "scheduled" | "agents" | "decide" | "arena";
+export type Page = "chat" | "models" | "store" | "projects" | "companion" | "api" | "scheduled" | "agents" | "decide" | "arena" | "tune";
 
 export type HudPhase = "idle" | "listening" | "thinking" | "working" | "done" | "error";
 

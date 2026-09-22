@@ -83,4 +83,15 @@ describe("model cards", () => {
     ].join("\n");
     expect(stripFrontMatter(card)).toBe("# Qwen\n\nRuns fast.");
   });
+
+  it("decodes the entities cards use to space their links", () => {
+    // Taken from a real card: badges separated by &nbsp; rendered as literal
+    // "&nbsp;" in the hub before this.
+    const card = '<a href="a">Website</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="b">Paper</a> &mdash; 2&#215;faster';
+    expect(stripFrontMatter(card)).toBe("Website  |  Paper — 2×faster");
+  });
+
+  it("leaves text that only looks like an entity alone", () => {
+    expect(stripFrontMatter("R&D; &madeup; fine")).toBe("R&D; &madeup; fine");
+  });
 });

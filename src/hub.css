@@ -1408,7 +1408,7 @@ input[type="checkbox"] {
   height: 11px;
 }
 
-.mono {
+.monogram {
   width: 36px;
   height: 36px;
   flex: 0 0 auto;
@@ -1423,13 +1423,13 @@ input[type="checkbox"] {
   border: 1px solid hsl(var(--h) 45% 86%);
 }
 
-:root[data-theme="dark"] .mono {
+:root[data-theme="dark"] .monogram {
   color: hsl(var(--h) 70% 72%);
   background: hsl(var(--h) 30% 16%);
   border-color: hsl(var(--h) 30% 24%);
 }
 
-.mono--lg {
+.monogram--lg {
   width: 56px;
   height: 56px;
   border-radius: 16px;
@@ -2871,7 +2871,9 @@ input[type="checkbox"] {
 
 .codebox pre {
   margin: 0;
-  padding: 18px 20px;
+  /* Room on the right for the Copy button, which otherwise sat on top of the
+     end of the first line. */
+  padding: 18px 96px 18px 20px;
   font-family: var(--mono);
   font-size: 12.5px;
   line-height: 1.65;
@@ -5782,4 +5784,537 @@ button.backend:active:not(:disabled) {
 .grant__where code {
   font-size: 12.5px;
   word-break: break-all;
+}
+
+.grantdoc {
+  display: grid;
+  gap: 12px;
+}
+
+.grantdoc .block__sub {
+  margin: 0;
+  max-width: 72ch;
+}
+
+/* ============ fine-tune ============ */
+
+.tune {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 28px;
+  align-items: start;
+}
+
+.tune__main {
+  display: grid;
+  gap: 34px;
+  min-width: 0;
+}
+
+.tune__step {
+  display: grid;
+  gap: 14px;
+}
+
+.tune__head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.tune__head .block__title {
+  margin: 0;
+}
+
+.tune__head .block__sub {
+  margin: 2px 0 0;
+}
+
+.tune__n {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--bg-3);
+  border: 1px solid var(--edge);
+  color: var(--text-2);
+  transition: background 200ms ease, color 200ms ease;
+}
+
+.tune__n[data-done="true"] {
+  background: var(--good);
+  border-color: transparent;
+  color: #fff;
+}
+
+.tune__n svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tune__seg {
+  justify-self: start;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tune__source {
+  display: grid;
+  gap: 12px;
+}
+
+.tune__list {
+  display: grid;
+  gap: 2px;
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-lg);
+  padding: 4px;
+  background: var(--bg-1);
+}
+
+.tune__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--r-md);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tune__row:hover,
+.tune__row:focus-visible {
+  background: var(--mat-thin);
+}
+
+.tune__rowtext {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+
+.tune__rowtext b {
+  font-weight: 560;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tune__rowtext span,
+.tune__rowmeta {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.tune__rowmeta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tune__rowmeta svg {
+  width: 12px;
+  height: 12px;
+  margin-left: 6px;
+}
+
+.tune__skel {
+  height: 44px;
+  border-radius: var(--r-md);
+  background: linear-gradient(90deg, var(--sunken) 25%, var(--mat-thin) 50%, var(--sunken) 75%);
+  background-size: 300% 100%;
+  animation: skel 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tune__skel {
+    animation: none;
+  }
+}
+
+.tune__skel--tall {
+  height: 180px;
+}
+
+.tune__crumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  min-width: 0;
+}
+
+.tune__crumb .linkbtn svg {
+  transform: rotate(90deg);
+  width: 13px;
+  height: 13px;
+}
+
+.tune__crumb b {
+  font-weight: 560;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tune__mapping,
+.tune__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.tune__mapping .select,
+.tune__grid .input,
+.tune__build .select {
+  width: 100%;
+  min-width: 0;
+}
+
+.tune__preview {
+  display: grid;
+  gap: 8px;
+}
+
+.tune__example {
+  border: 1px solid var(--edge);
+  border-radius: var(--r-md);
+  background: var(--bg-1);
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.tune__turn {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tune__turn em {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+  padding-top: 2px;
+}
+
+.tune__turn[data-role="assistant"] span {
+  color: var(--text-2);
+}
+
+.tune__turn span {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tune__build {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tune__build .form {
+  min-width: 170px;
+}
+
+.tune__grow {
+  flex: 1;
+}
+
+.tune__drop {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 28px 16px;
+  border: 1.5px dashed var(--edge-bright);
+  border-radius: var(--r-lg);
+  background: var(--bg-1);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.tune__drop:hover,
+.tune__drop:focus-visible {
+  border-color: var(--accent-ring);
+  background: var(--accent-soft);
+}
+
+.tune__drop svg {
+  width: 20px;
+  height: 20px;
+  color: var(--text-3);
+}
+
+.tune__drop span {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.tune__methods {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tune__method {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--edge);
+  background: var(--bg-1);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.tune__method b {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.tune__method span {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+
+.tune__method[aria-pressed="true"] {
+  border-color: var(--accent-ring);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent-ring);
+}
+
+.tune__run {
+  display: grid;
+  gap: 12px;
+}
+
+.tune__problems {
+  margin: 0;
+  padding: 10px 14px 10px 30px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in srgb, var(--live) 35%, transparent);
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.tune__cmd {
+  display: grid;
+  gap: 4px;
+  font-size: 12.5px;
+}
+
+.tune__cmd code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--bg-3);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.tune__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tune__after summary {
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--text-2);
+  padding: 4px 0;
+}
+
+.tune__after[open] summary {
+  margin-bottom: 10px;
+}
+
+.tune__side {
+  position: sticky;
+  top: 12px;
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--edge);
+  background: var(--bg-1);
+}
+
+.tune__label {
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.tune__gpu {
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.tune__fit {
+  margin: 10px 0 6px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--bg-3);
+  display: grid;
+  gap: 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.tune__fit[data-fits="true"] {
+  background: color-mix(in srgb, var(--good) 13%, transparent);
+}
+
+.tune__fit[data-fits="false"] {
+  background: color-mix(in srgb, var(--live) 12%, transparent);
+}
+
+.tune__need {
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.tune__need small {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.tune__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 4px 0 0;
+  font-size: 12.5px;
+}
+
+.tune__facts dt {
+  color: var(--text-3);
+}
+
+.tune__facts dd {
+  margin: 0;
+  text-align: right;
+}
+
+.tune__pkgs {
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+@container (max-width: 880px) {
+  .tune {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tune__side {
+    position: static;
+    order: -1;
+  }
+  .tune__methods {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ============ narrow windows: the sidebar becomes a rail ============ */
+
+/* Below this width a 268px sidebar left the page itself a couple of hundred
+   pixels wide. The rail keeps every destination one click away; recent chats
+   stay reachable through Ctrl+K. */
+@media (max-width: 760px) {
+  .nav {
+    width: 60px;
+  }
+  .nav__top {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .nav__name,
+  .nav__top .nav__icon,
+  .nav__search,
+  .navitem__label,
+  .navitem__hint,
+  .nav__recents,
+  .me__text {
+    display: none;
+  }
+  .nav__list {
+    padding-inline: 8px;
+  }
+  .navitem__row {
+    justify-content: center;
+  }
+  .navitem__live {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+  }
+  .navitem {
+    position: relative;
+  }
+  .nav__foot {
+    flex-direction: column;
+    gap: 6px;
+    margin-top: auto;
+    padding-inline: 0;
+    align-items: center;
+  }
+  .me--btn {
+    width: auto;
+    padding: 4px;
+  }
+}
+
+/* A chip is one line. A row of them that does not fit scrolls sideways
+   instead of breaking each label over two lines. */
+.chip {
+  white-space: nowrap;
+  flex: none;
+}
+
+.chips:not(.chips--wrap) {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chips:not(.chips--wrap)::-webkit-scrollbar {
+  display: none;
+}
+
+.tune__source .chips {
+  margin: 0;
 }

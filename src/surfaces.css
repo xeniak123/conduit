@@ -471,14 +471,10 @@
 /* Large display text fades toward its baseline, the way set metal catches
    less light at the bottom of a letterform. */
 .welcome__title {
-  background: linear-gradient(180deg, var(--text), rgba(242, 241, 244, 0.6));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-:root[data-theme="light"] .welcome__title {
-  background: linear-gradient(180deg, var(--text), rgba(21, 20, 26, 0.58));
+  /* Derived from the text colour rather than written per theme, so the fade
+     is the same gentle one in light and dark, and a theme that has not been
+     resolved yet never shows a light stop on a light page. */
+  background: linear-gradient(180deg, var(--text) 35%, color-mix(in srgb, var(--text) 68%, transparent));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

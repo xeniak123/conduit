@@ -28,7 +28,7 @@ export function createAnthropic(baseUrl?: string): Provider {
   return {
     id: "anthropic",
     label: "Anthropic",
-    suggestedModels: ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"],
+    suggestedModels: ["claude-opus-5-5", "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"],
     completeStream: streamAnthropic,
 
     async complete(req: CompleteRequest): Promise<CompleteResult> {

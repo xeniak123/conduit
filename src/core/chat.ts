@@ -178,7 +178,7 @@ export async function sendMessage(
             model: picked.model.model,
             tier: picked.tier,
             reason: picked.reason,
-            saved: picked.tier === "fast" ? saved(tiers(base).strong.model, picked.model.model, run.usage.input, run.usage.output) : null,
+            saved: picked.tier === "fast" ? saved(tiers(base).strong, picked.model, run.usage.input, run.usage.output) : null,
           }
         : undefined,
     });

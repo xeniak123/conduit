@@ -158,9 +158,40 @@ export function stripFrontMatter(text: string): string {
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, "")
     .replace(/<\/?[a-zA-Z][^>]*>/g, "")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-    .replace(/^[ \t]+$/gm, "")
+    // Entities go after the tags: a card that spaces its badges with &nbsp;
+    // would otherwise show the entity names as text.
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, decodeEntity)
+    .replace(/^[ \t ]+$/gm, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+const NAMED: Record<string, string> = {
+  nbsp: " ",
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  mdash: "—",
+  ndash: "–",
+  hellip: "…",
+  copy: "©",
+  reg: "®",
+  trade: "™",
+  middot: "·",
+  bull: "•",
+  rarr: "→",
+  larr: "←",
+};
+
+function decodeEntity(whole: string, body: string): string {
+  if (body[0] === "#") {
+    const hex = body[1] === "x" || body[1] === "X";
+    const code = hex ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+    return Number.isFinite(code) && code > 0 && code < 0x110000 ? String.fromCodePoint(code) : whole;
+  }
+  return NAMED[body.toLowerCase()] ?? whole;
 }
 
 export function fileUrl(id: string, path: string): string {

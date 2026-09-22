@@ -12,6 +12,18 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..750&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <script>document.documentElement.classList.add("js")</script>
+<script>
+// A sign-in started from the Conduit app should come back to connect.html. If
+// the auth server sends it to the home page instead (its redirect list does not
+// include connect.html yet), the code is passed on rather than lost; the port
+// it needs was stashed by connect.html when the sign-in began.
+(function () {
+  var q = new URLSearchParams(location.search);
+  var pending = null;
+  try { pending = localStorage.getItem("conduit.connect.v1"); } catch (e) {}
+  if (q.get("code") && pending) location.replace("./connect.html" + location.search);
+})();
+</script>
 <style>
 :root {
   --canvas: #f6f6f3;

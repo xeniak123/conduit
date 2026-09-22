@@ -95,7 +95,7 @@ export function Quick() {
           model: settings.command.model,
           input: result.usage.input,
           output: result.usage.output,
-          cost: costOf(settings.command.model, result.usage.input, result.usage.output),
+          cost: costOf(settings.command.model, result.usage.input, result.usage.output, settings.command.provider),
         });
       }
       setState("answered");

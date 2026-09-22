@@ -44,6 +44,13 @@ export interface ColumnMapping {
   response: string;
   /** Column holding a system instruction, if the dataset has one. */
   system?: string;
+  /**
+   * Extra material for the question, as in Alpaca's `input` column: "Summarise
+   * this" in one column, the text to summarise in the next. Appended to the
+   * question when a row has it, so those examples are not trained without
+   * the very thing they are about.
+   */
+  context?: string;
 }
 
 async function getJson<T>(url: string, auth = false): Promise<T> {
@@ -116,8 +123,14 @@ export async function datasetSplits(id: string): Promise<Array<{ config: string;
   return body.splits ?? [];
 }
 
-export async function datasetRows(id: string, config: string, split: string, length = 20): Promise<DatasetRows> {
-  const params = new URLSearchParams({ dataset: id, config, split, offset: "0", length: String(length) });
+export async function datasetRows(
+  id: string,
+  config: string,
+  split: string,
+  length = 20,
+  offset = 0,
+): Promise<DatasetRows> {
+  const params = new URLSearchParams({ dataset: id, config, split, offset: String(offset), length: String(length) });
   const body = await getJson<{
     features?: Array<{ name: string }>;
     rows?: Array<{ row: Record<string, unknown> }>;
@@ -128,6 +141,36 @@ export async function datasetRows(id: string, config: string, split: string, len
     rows: (body.rows ?? []).map((r) => r.row),
     total: body.num_rows_total ?? null,
   };
+}
+
+/**
+ * Up to `count` rows, a page at a time.
+ *
+ * The rows service hands out at most a hundred per request, which is also a
+ * polite size; a progress callback keeps a two-thousand-row pull from looking
+ * like a hang.
+ */
+export async function collectRows(
+  id: string,
+  config: string,
+  split: string,
+  count: number,
+  onProgress?: (have: number) => void,
+  signal?: AbortSignal,
+): Promise<DatasetRows> {
+  const rows: Array<Record<string, unknown>> = [];
+  let columns: string[] = [];
+  let total: number | null = null;
+  while (rows.length < count) {
+    if (signal?.aborted) break;
+    const page = await datasetRows(id, config, split, Math.min(100, count - rows.length), rows.length);
+    if (!columns.length) columns = page.columns;
+    total = page.total;
+    rows.push(...page.rows);
+    onProgress?.(rows.length);
+    if (page.rows.length === 0 || (total !== null && rows.length >= total)) break;
+  }
+  return { columns, rows, total };
 }
 
 /** Column names the training formats actually use, in the order they are usually right. */
@@ -148,10 +191,12 @@ export function guessMapping(columns: string[]): ColumnMapping {
   // A conversation column carries both sides already; pairing it with a
   // response column would duplicate the answer.
   const conversation = ["messages", "conversations", "conversation"].includes(prompt);
+  const chosenPrompt = prompt || columns[0] || "";
   return {
-    prompt: prompt || columns[0] || "",
+    prompt: chosenPrompt,
     response: conversation ? "" : find(RESPONSE_NAMES) || columns[1] || "",
     system: find(SYSTEM_NAMES) || undefined,
+    context: chosenPrompt === "instruction" && columns.includes("input") ? "input" : undefined,
   };
 }
 
@@ -195,7 +240,9 @@ export function rowToChat(row: Record<string, unknown>, mapping: ColumnMapping):
     return turns.some((t) => t.role === "assistant") ? turns : [];
   }
 
-  const user = asText(prompt).trim();
+  const extra = mapping.context ? asText(row[mapping.context]).trim() : "";
+  const question = asText(prompt).trim();
+  const user = extra ? `${question}\n\n${extra}` : question;
   const assistant = mapping.response ? asText(row[mapping.response]).trim() : "";
   if (!user || !assistant) return [];
   turns.push({ role: "user", content: user }, { role: "assistant", content: assistant });
@@ -279,4 +326,54 @@ function parseSeparated(text: string, sep: string): DatasetRows {
     .filter((r) => r.some((cell) => cell.trim()))
     .map((r) => Object.fromEntries(header.map((name, i) => [name, r[i] ?? ""])));
   return { columns: header, rows, total: rows.length };
+}
+
+/** The parts of a saved conversation a training file needs. */
+export interface ConversationLike {
+  title: string;
+  messages: Array<{ role: "user" | "assistant"; text: string; pending?: boolean }>;
+}
+
+/**
+ * Your own chats as training data.
+ *
+ * The most useful dataset most people have is the one they already wrote: the
+ * questions they actually ask, answered the way they kept. Each conversation
+ * becomes one example, cut to the turns that have both a question and a
+ * finished answer, so a reply that was stopped half-way never teaches the
+ * model to stop half-way.
+ */
+export function conversationsToJsonl(conversations: ConversationLike[], system = ""): { jsonl: string; count: number } {
+  const lines: string[] = [];
+  for (const conversation of conversations) {
+    const turns: ChatTurn[] = system.trim() ? [{ role: "system", content: system.trim() }] : [];
+    for (const message of conversation.messages) {
+      const content = message.text.trim();
+      if (!content || message.pending) continue;
+      // Two user turns in a row (a retry, an edit) keep only the later one.
+      const last = turns[turns.length - 1];
+      if (last && last.role === message.role) {
+        last.content = content;
+        continue;
+      }
+      turns.push({ role: message.role, content });
+    }
+    // Ends on the model's answer, and has at least one exchange.
+    while (turns.length && turns[turns.length - 1].role !== "assistant") turns.pop();
+    if (turns.some((t) => t.role === "user") && turns.some((t) => t.role === "assistant")) {
+      lines.push(JSON.stringify({ messages: turns }));
+    }
+  }
+  return { jsonl: lines.join("\n"), count: lines.length };
+}
+
+/** A file name from a dataset or model id: "tatsu-lab/alpaca" → "tatsu-lab-alpaca". */
+export function slugify(text: string): string {
+  return (
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "dataset"
+  );
 }

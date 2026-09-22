@@ -148,15 +148,49 @@ fn error(status: u16, message: &str) -> tiny_http::Response<std::io::Cursor<Vec<
     )
 }
 
-fn authorised(config: &Config, request: &tiny_http::Request) -> bool {
-    let remote_local = request
+fn from_loopback(request: &tiny_http::Request) -> bool {
+    request
         .remote_addr()
         .map(|a| match a.ip() {
             IpAddr::V4(v4) => v4.is_loopback(),
             IpAddr::V6(v6) => v6.is_loopback(),
         })
-        .unwrap_or(false);
-    if config.keyless_local && remote_local {
+        .unwrap_or(false)
+}
+
+/// Whether a request was made by a web page, and which one.
+///
+/// Browsers attach `Origin` to every cross-origin request and a page cannot
+/// remove it; programs (curl, the SDKs, a coding agent) do not send one at all.
+/// That difference is what separates "a program on this computer" from "a
+/// website this computer happens to be showing", which a check on the remote
+/// address alone cannot: both arrive from 127.0.0.1.
+fn web_origin(request: &tiny_http::Request) -> Option<String> {
+    request
+        .headers()
+        .iter()
+        .find(|h| h.field.equiv("origin"))
+        .map(|h| h.value.as_str().trim().to_ascii_lowercase())
+        .filter(|o| !o.is_empty() && o != "null")
+}
+
+/// Pages Conduit itself serves or runs in. Everything else is a stranger.
+fn trusted_origin(origin: &str) -> bool {
+    let host = origin.split("://").nth(1).unwrap_or("").split(['/', ':']).next().unwrap_or("");
+    origin.starts_with("tauri://") || host == "127.0.0.1" || host == "localhost" || host == "tauri.localhost" || host == "[::1]"
+}
+
+fn authorised(config: &Config, request: &tiny_http::Request) -> bool {
+    // "Programs on this computer need no token" must not quietly include every
+    // website open in a browser on this computer. Without the origin check any
+    // page could POST to 127.0.0.1 and spend the user's provider credits, since
+    // the answer is served with a permissive CORS header. A web page gets in
+    // with a token, like any other device would.
+    let keyless = match web_origin(request) {
+        None => true,
+        Some(origin) => trusted_origin(&origin),
+    };
+    if config.keyless_local && keyless && from_loopback(request) {
         return true;
     }
     let token = request
@@ -220,6 +254,14 @@ fn handle(app: AppHandle, config: &Config, mut request: tiny_http::Request) {
     // this is how a program that has no token gets one. Nothing here reaches a
     // model, and every grant is decided in Conduit's own window.
     if path.starts_with("/oauth/") {
+        // Only programs on this machine may ask. With the API open to the
+        // network, anything on the Wi-Fi could otherwise raise the dialog and
+        // collect a key the moment somebody clicks Allow without reading.
+        if !from_loopback(&request) {
+            let _ = request.respond(error(403, "Access can only be requested from this computer."));
+            log(403, None);
+            return;
+        }
         oauth_route(&app, config, request, &path);
         log(200, None);
         return;
@@ -340,6 +382,16 @@ fn percent_decode(value: &str) -> String {
     String::from_utf8_lossy(&out).to_string()
 }
 
+fn percent_encode(value: &str) -> String {
+    value
+        .bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
+}
+
 fn html_response(status: u16, body: String) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
     tiny_http::Response::from_string(body)
         .with_status_code(status)
@@ -408,7 +460,10 @@ fn oauth_route(app: &AppHandle, config: &Config, request: tiny_http::Request, pa
                         let joiner = if redirect.contains('?') { '&' } else { '?' };
                         let mut url = format!("{redirect}{joiner}code={code}");
                         if !state.is_empty() {
-                            url.push_str(&format!("&state={state}"));
+                            // Encoded again: the state came in decoded, and an
+                            // `&` or `#` in it would otherwise add parameters to
+                            // the program's callback that it never sent.
+                            url.push_str(&format!("&state={}", percent_encode(&state)));
                         }
                         serde_json::json!({ "status": "approved", "redirect": url })
                     }

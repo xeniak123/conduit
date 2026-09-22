@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guessMapping, parseLocalDataset, rowToChat, toChatJsonl } from "./datasets";
+import { conversationsToJsonl, guessMapping, parseLocalDataset, rowToChat, slugify, toChatJsonl } from "./datasets";
 
 describe("guessing the columns", () => {
   it("finds an instruction dataset's pair", () => {
@@ -7,6 +7,7 @@ describe("guessing the columns", () => {
       prompt: "instruction",
       response: "output",
       system: undefined,
+      context: "input",
     });
   });
 
@@ -28,6 +29,15 @@ describe("turning rows into chat turns", () => {
       { role: "user", content: "Hi" },
       { role: "assistant", content: "Hello" },
     ]);
+  });
+
+  it("adds Alpaca's input to the question when a row has one", () => {
+    const alpaca = { prompt: "instruction", response: "output", context: "input" };
+    expect(rowToChat({ instruction: "Summarise this.", input: "A long text.", output: "Short." }, alpaca)[0]).toEqual({
+      role: "user",
+      content: "Summarise this.\n\nA long text.",
+    });
+    expect(rowToChat({ instruction: "Say hi.", input: "", output: "Hi." }, alpaca)[0].content).toBe("Say hi.");
   });
 
   it("keeps the system turn first", () => {
@@ -85,5 +95,53 @@ describe("local files", () => {
   it("reads a doubled quote as one quote", () => {
     const parsed = parseLocalDataset('a\n"say ""hi"""\n', "data.csv");
     expect(parsed.rows[0].a).toBe('say "hi"');
+  });
+});
+
+describe("your own chats as training data", () => {
+  it("turns each conversation into one example", () => {
+    const { jsonl, count } = conversationsToJsonl([
+      {
+        title: "a",
+        messages: [
+          { role: "user", text: "Hi" },
+          { role: "assistant", text: "Hello" },
+        ],
+      },
+      { title: "b", messages: [{ role: "user", text: "Only a question" }] },
+    ]);
+    expect(count).toBe(1);
+    expect(JSON.parse(jsonl).messages).toEqual([
+      { role: "user", content: "Hi" },
+      { role: "assistant", content: "Hello" },
+    ]);
+  });
+
+  it("drops an unfinished answer and a trailing question", () => {
+    const { jsonl } = conversationsToJsonl([
+      {
+        title: "a",
+        messages: [
+          { role: "user", text: "One" },
+          { role: "assistant", text: "Answer one" },
+          { role: "user", text: "Two" },
+          { role: "assistant", text: "half", pending: true },
+        ],
+      },
+    ]);
+    expect(JSON.parse(jsonl).messages.map((m: { content: string }) => m.content)).toEqual(["One", "Answer one"]);
+  });
+
+  it("adds a system turn when one is given", () => {
+    const { jsonl } = conversationsToJsonl(
+      [{ title: "a", messages: [{ role: "user", text: "Hi" }, { role: "assistant", text: "Yo" }] }],
+      "Be brief.",
+    );
+    expect(JSON.parse(jsonl).messages[0]).toEqual({ role: "system", content: "Be brief." });
+  });
+
+  it("makes file names out of ids", () => {
+    expect(slugify("tatsu-lab/alpaca")).toBe("tatsu-lab-alpaca");
+    expect(slugify("///")).toBe("dataset");
   });
 });

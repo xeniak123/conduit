@@ -259,6 +259,10 @@
 
 .wizard {
   width: min(680px, 92vw);
+  /* One height for every step, so Continue and Back stay under the pointer
+     instead of jumping each time a step is taller or shorter than the last.
+     The body scrolls on the rare step that needs more. */
+  height: min(540px, 88vh);
   max-height: 88vh;
   display: flex;
   flex-direction: column;

@@ -21,8 +21,21 @@ describe("pricing", () => {
   });
 
   it("treats anything running locally as free", () => {
-    for (const model of ["llama3.3", "qwen2.5-coder", "some-local-thing"]) {
-      expect(costOf(model, 1_000_000, 1_000_000), model).toBe(0);
+    for (const [model, provider] of [
+      ["llama3.3", "ollama"],
+      ["qwen2.5-coder", "local"],
+      ["Qwen3-8B-Q4_K_M.gguf", "local"],
+    ]) {
+      expect(costOf(model, 1_000_000, 1_000_000, provider), model).toBe(0);
+    }
+    expect(costOf("local/qwen3-8b", 1_000_000, 1_000_000)).toBe(0);
+  });
+
+  it("does not call a cloud model free because of its name", () => {
+    // Qwen on OpenRouter is billed. It used to be priced at zero because the
+    // name contains "qwen", which hid real spending from the daily budget.
+    for (const model of ["qwen/qwen3-max", "meta-llama/llama-4-maverick", "mistralai/mistral-large"]) {
+      expect(costOf(model, 1_000_000, 1_000_000, "openrouter"), model).not.toBe(0);
     }
   });
 
