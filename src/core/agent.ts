@@ -362,6 +362,10 @@ async function executeCall(
 function summarise(tool: Tool, call: ToolCall): string {
   if (call.name === "shell.run") return String(call.input.command ?? "");
   if (call.name.startsWith("fs.")) return `${tool.name}  ${String(call.input.path ?? "")}`;
+  // A code edit is approved on what it does to the file, not on the tool's
+  // name: the user needs to see the lines going out and the lines coming in.
+  if (call.name === "code.edit") return `${call.name}  ${String(call.input.path ?? "")}`;
+  if (call.name.startsWith("code.")) return `${call.name}  ${String(call.input.path ?? "")}`;
   if (call.name === "screen.type") return `Type: ${String(call.input.text ?? "")}`;
   if (call.name === "screen.key") return `Press ${(call.input.keys as string[])?.join("+")}`;
   if (call.name === "screen.click") return `Click at (${call.input.x}, ${call.input.y})`;
@@ -369,9 +373,23 @@ function summarise(tool: Tool, call: ToolCall): string {
 }
 
 function contextLine(call: ToolCall, ctx: ToolContext): string | undefined {
+  if (call.name === "code.edit") return editPreview(call);
   if (call.input.cwd) return `in ${String(call.input.cwd)}`;
   if (call.name.startsWith("screen.") && ctx.focus.process) return `in ${ctx.focus.process}`;
   return undefined;
+}
+
+/** The edit as a diff, so what is approved is what will happen. */
+function editPreview(call: ToolCall): string {
+  const minus = String(call.input.find ?? "")
+    .split("\n")
+    .slice(0, 12)
+    .map((line) => `- ${line}`);
+  const plus = String(call.input.replace ?? "")
+    .split("\n")
+    .slice(0, 12)
+    .map((line) => `+ ${line}`);
+  return [...minus, ...plus].join("\n");
 }
 
 /**
@@ -487,6 +505,13 @@ function systemPrompt(ctx: ToolContext, settings: Settings): string {
       "- Never claim a test or a build passed unless you ran it and saw it pass.",
       "- A zero exit code from a pipeline belongs to the last command in it.",
       "  Check the one you actually care about.",
+      "",
+      "Working method in an unfamiliar project: code.context to see what it is,",
+      "code.tree or code.search to find the right file, code.outline to find the",
+      "right part of it, code.read to see the lines, then code.edit or",
+      "code.insert. Finish with code.diff and read it: it is the last chance to",
+      "catch an edit that went somewhere you did not mean. code.undo puts a file",
+      "back if it did.",
     );
 
     const test = settings.code.testCommand.trim();

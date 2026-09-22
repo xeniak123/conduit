@@ -5708,3 +5708,78 @@ button.backend:active:not(:disabled) {
     border-radius: var(--r-xl) var(--r-xl) 0 0;
   }
 }
+
+/* --- signing in, and letting another program in -------------------------- */
+
+.acct__oauth {
+  width: 100%;
+  justify-content: center;
+  gap: 10px;
+}
+
+.acct__oauth + .acct__oauth {
+  margin-top: 10px;
+}
+
+.grant {
+  max-width: 460px;
+  text-align: left;
+}
+
+.grant__head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.grant__head b {
+  display: block;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.grant__head span {
+  font-size: 13px;
+}
+
+.grant__list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  font-size: 13.5px;
+}
+
+.grant__list li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.grant__list svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  margin-top: 2px;
+  opacity: 0.8;
+}
+
+.grant__never {
+  opacity: 0.72;
+}
+
+.grant__where {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--sunk, rgba(127, 127, 127, 0.08));
+  margin-bottom: 16px;
+}
+
+.grant__where code {
+  font-size: 12.5px;
+  word-break: break-all;
+}

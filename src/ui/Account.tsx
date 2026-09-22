@@ -1,31 +1,21 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import {
-  changePassword,
-  deleteSyncedData,
-  pull,
-  resendConfirmation,
-  resetPassword,
-  signIn,
-  signOut,
-  signUp,
-  useAccount,
-} from "@/core/account";
+import { deleteSyncedData, pull, SITE, signInInBrowser, signOut, useAccount } from "@/core/account";
+import { invoke } from "@tauri-apps/api/core";
 import { useApp } from "@/core/store";
 import { Icon } from "./icons";
 import { Logo } from "./Logo";
-import { SPRING, SPRING_SNAP } from "./motion";
+import { SPRING } from "./motion";
 
 /**
  * Accounts, opened from the name in the sidebar.
  *
- * Signed out: one form that switches between signing in, creating an account
- * and resetting a forgotten password, next to a plain list of what an account
- * does (and the one thing it never does). Signed in: what is synced, when,
- * and the few things you might want to change.
+ * Signed out: two buttons, and no password field. Signing in happens in the
+ * browser, where the address bar is visible and a password manager works, and
+ * comes back to Conduit on its own — so nothing about the account is ever
+ * typed into this window. Signed in: what is synced, when, and the few things
+ * you might want to change.
  */
-
-type Mode = "in" | "up" | "reset";
 
 export function AccountDialog({ onClose }: { onClose: () => void }) {
   const session = useAccount((s) => s.session);
@@ -49,56 +39,22 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
 }
 
 function SignedOut() {
-  const [mode, setMode] = useState<Mode>("in");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [show, setShow] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<{ ok: boolean; text: string; resend?: boolean } | null>(null);
+  const [busy, setBusy] = useState<"google" | "email" | null>(null);
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const strength = score(password);
-  const valid =
-    /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()) &&
-    (mode === "reset" || password.length >= 8) &&
-    (mode !== "up" || confirm === password);
-
-  const submit = async () => {
-    if (!valid || busy) return;
-    setBusy(true);
-    setNote(null);
+  const start = async (hint: "google" | "email") => {
+    if (busy) return;
+    setBusy(hint);
+    setNote({ ok: true, text: "Finish signing in in your browser. This window will notice when you do." });
     try {
-      if (mode === "reset") {
-        await resetPassword(email.trim());
-        setNote({ ok: true, text: `If ${email.trim()} has an account, a link to choose a new password is on its way. Open it on any device.` });
-      } else if (mode === "up") {
-        const r = await signUp(email.trim(), password);
-        if (r === "confirm") {
-          setNote({ ok: true, text: `Almost there. Open the link sent to ${email.trim()}, then sign in here.`, resend: true });
-          setMode("in");
-          setConfirm("");
-        }
-      } else {
-        await signIn(email.trim(), password);
-      }
-    } catch (e) {
-      const text = e instanceof Error ? e.message : String(e);
-      setNote({ ok: false, text, resend: /confirm your email/i.test(text) });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const resend = async () => {
-    try {
-      await resendConfirmation(email.trim());
-      setNote({ ok: true, text: `Sent a new confirmation link to ${email.trim()}.` });
+      await signInInBrowser(hint);
+      setNote(null);
     } catch (e) {
       setNote({ ok: false, text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setBusy(null);
     }
   };
-
-  const title = mode === "in" ? "Welcome back" : mode === "up" ? "Create your account" : "Reset your password";
 
   return (
     <div className="acct__split">
@@ -125,101 +81,21 @@ function SignedOut() {
       </aside>
 
       <div className="acct__form">
-        {mode !== "reset" && (
-          <div className="seg acct__tabs">
-            {(
-              [
-                ["in", "Sign in"],
-                ["up", "Create account"],
-              ] as Array<[Mode, string]>
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                className="seg__item"
-                aria-current={mode === id}
-                onPointerDown={() => {
-                  setMode(id);
-                  setNote(null);
-                }}
-              >
-                {mode === id && <motion.span layoutId="acct-tab" className="seg__pill" transition={SPRING_SNAP} />}
-                <span>{label}</span>
-              </button>
-            ))}
-          </div>
-        )}
+        <h2 className="acct__title">Sign in to Conduit</h2>
+        <p className="muted acct__lead">
+          This opens your browser. Conduit has no password field — whatever you sign in with stays between you and the
+          browser, and only a one-time code comes back.
+        </p>
 
-        <h2 className="acct__title">{title}</h2>
-        {mode === "reset" && <p className="muted acct__lead">Enter your email and we will send a link to choose a new password.</p>}
+        <button className="btn btn--lg acct__oauth" disabled={busy !== null} onPointerDown={() => void start("google")}>
+          {busy === "google" ? <span className="spin" /> : <GoogleMark />}
+          Continue with Google
+        </button>
 
-        <label className="form">
-          <span>Email</span>
-          <input
-            className="input"
-            type="email"
-            autoComplete="email"
-            autoFocus
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && void submit()}
-          />
-        </label>
-
-        {mode !== "reset" && (
-          <label className="form">
-            <span className="acct__labelrow">
-              Password
-              {mode === "in" && (
-                <button
-                  className="linkbtn"
-                  type="button"
-                  onPointerDown={() => {
-                    setMode("reset");
-                    setNote(null);
-                  }}
-                >
-                  Forgot password?
-                </button>
-              )}
-            </span>
-            <span className="acct__pw">
-              <input
-                className="input"
-                type={show ? "text" : "password"}
-                autoComplete={mode === "up" ? "new-password" : "current-password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && void submit()}
-              />
-              <button type="button" className="acct__eye" aria-label={show ? "Hide password" : "Show password"} onPointerDown={() => setShow(!show)}>
-                {show ? "Hide" : "Show"}
-              </button>
-            </span>
-            {mode === "up" && password && (
-              <span className="acct__strength" data-level={strength.level}>
-                <i />
-                <i />
-                <i />
-                <em>{strength.label}</em>
-              </span>
-            )}
-          </label>
-        )}
-
-        {mode === "up" && (
-          <label className="form">
-            <span>Repeat password</span>
-            <input
-              className="input"
-              type={show ? "text" : "password"}
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && void submit()}
-            />
-            {confirm && confirm !== password && <em className="form__hint form__hint--warn">The passwords differ.</em>}
-          </label>
-        )}
+        <button className="btn btn--ink btn--lg acct__oauth" disabled={busy !== null} onPointerDown={() => void start("email")}>
+          {busy === "email" ? <span className="spin spin--ink" /> : <Icon.compose />}
+          Continue with email
+        </button>
 
         <AnimatePresence>
           {note && (
@@ -230,27 +106,36 @@ function SignedOut() {
               exit={{ opacity: 0, height: 0 }}
             >
               {note.text}
-              {note.resend && email.trim() && (
-                <button className="linkbtn acct__resend" onPointerDown={() => void resend()}>
-                  Send the link again
-                </button>
-              )}
             </motion.div>
           )}
         </AnimatePresence>
 
-        <button className="btn btn--ink btn--lg acct__submit" disabled={!valid || busy} onPointerDown={() => void submit()}>
-          {busy ? <span className="spin spin--ink" /> : null}
-          {mode === "in" ? "Sign in" : mode === "up" ? "Create account" : "Send reset link"}
+        <button className="linkbtn acct__back" onPointerDown={() => void invoke("open_target", { target: SITE })}>
+          Open the website instead
         </button>
-
-        {mode === "reset" && (
-          <button className="linkbtn acct__back" onPointerDown={() => setMode("in")}>
-            Back to sign in
-          </button>
-        )}
       </div>
     </div>
+  );
+}
+
+/** Google's mark, drawn rather than fetched: this window loads nothing remote. */
+function GoogleMark() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M45.1 24.5c0-1.6-.1-3.2-.4-4.7H24v8.9h11.8c-.5 2.8-2 5.1-4.4 6.7v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.4z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 46c5.9 0 10.9-2 14.5-5.3l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.3 15.4 46 24 46z"
+      />
+      <path fill="#FBBC05" d="M11.8 28.3c-.4-1.3-.7-2.7-.7-4.3s.3-3 .7-4.3v-5.7H4.5A22 22 0 0 0 2 24c0 3.6.9 6.9 2.5 9.9l7.3-5.6z" />
+      <path
+        fill="#EA4335"
+        d="M24 10.5c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 3.9 29.9 2 24 2 15.4 2 8.1 6.7 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9.3 12.2-9.3z"
+      />
+    </svg>
   );
 }
 
@@ -260,8 +145,6 @@ function Profile({ onClose }: { onClose: () => void }) {
   const lastSync = useAccount((s) => s.lastSync);
   const error = useAccount((s) => s.error);
   const settings = useApp((s) => s.settings);
-  const [changing, setChanging] = useState(false);
-  const [pw, setPw] = useState("");
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -311,35 +194,10 @@ function Profile({ onClose }: { onClose: () => void }) {
 
       <div className="acct__rows">
         <div className="acct__row">
-          <span>Password</span>
-          {changing ? (
-            <span className="acct__inline">
-              <input className="input input--small" type="password" autoFocus placeholder="New password, 8+ characters" value={pw} onChange={(e) => setPw(e.target.value)} />
-              <button
-                className="btn btn--small btn--ink"
-                disabled={pw.length < 8}
-                onPointerDown={async () => {
-                  try {
-                    await changePassword(pw);
-                    setNote({ ok: true, text: "Password changed." });
-                    setChanging(false);
-                    setPw("");
-                  } catch (e) {
-                    setNote({ ok: false, text: e instanceof Error ? e.message : String(e) });
-                  }
-                }}
-              >
-                Save
-              </button>
-              <button className="btn btn--small" onPointerDown={() => setChanging(false)}>
-                Cancel
-              </button>
-            </span>
-          ) : (
-            <button className="btn btn--small" onPointerDown={() => setChanging(true)}>
-              Change
-            </button>
-          )}
+          <span>Sign-in and password</span>
+          <button className="btn btn--small" onPointerDown={() => void invoke("open_target", { target: SITE })}>
+            <Icon.external /> On the website
+          </button>
         </div>
         <div className="acct__row">
           <span>Synced data</span>
@@ -385,13 +243,4 @@ function Profile({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
-}
-
-/** A rough, honest strength hint: length and variety, nothing cleverer. */
-function score(pw: string): { level: 0 | 1 | 2 | 3; label: string } {
-  if (pw.length < 8) return { level: 0, label: "Too short" };
-  const kinds = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((re) => re.test(pw)).length;
-  if (pw.length >= 14 || (pw.length >= 10 && kinds >= 3)) return { level: 3, label: "Strong" };
-  if (pw.length >= 10 || kinds >= 3) return { level: 2, label: "Good" };
-  return { level: 1, label: "Fair" };
 }

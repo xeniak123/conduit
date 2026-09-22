@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Connect your app to Conduit</title>
+<meta name="description" content="Let your application sign users in to Conduit and use the models on their own machine — an OAuth-style handshake with PKCE, no API key to paste." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%231a1a17'/%3E%3Cg transform='translate(18 18) scale(.64)' fill='none' stroke='%23fff' stroke-linecap='round'%3E%3Cpath d='M58 18H34a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h24' stroke-width='12'/%3E%3Cpath d='M64 40H48a8 8 0 0 0-8 8v4a8 8 0 0 0 8 8h16' stroke-width='10'/%3E%3C/g%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..750&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --canvas: #f6f6f3; --paper: #fff; --sunken: #efefea; --ink: #1a1a17; --ink-2: #5e5e57; --ink-3: #98988f;
+  --edge: rgba(20, 20, 16, .09); --edge-2: rgba(20, 20, 16, .16); --ember: #ff6a1f; --good: #16a172;
+  --shadow: 0 1px 2px rgba(20, 20, 16, .05), 0 12px 32px -16px rgba(20, 20, 16, .22);
+  --ui: "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #0f0f11; --paper: #18181b; --sunken: #121214; --ink: #f2f2ee; --ink-2: #a3a39c; --ink-3: #6c6c66;
+    --edge: rgba(255, 255, 255, .08); --edge-2: rgba(255, 255, 255, .15);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 32px -16px rgba(0, 0, 0, .8);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --canvas: #0f0f11; --paper: #18181b; --sunken: #121214; --ink: #f2f2ee; --ink-2: #a3a39c; --ink-3: #6c6c66;
+  --edge: rgba(255, 255, 255, .08); --edge-2: rgba(255, 255, 255, .15);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--canvas); color: var(--ink); font-family: var(--ui);
+  font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+}
+.wrap { width: min(880px, calc(100% - 44px)); margin: 0 auto; }
+nav { border-bottom: 1px solid var(--edge); position: sticky; top: 0; background: color-mix(in srgb, var(--canvas) 86%, transparent); backdrop-filter: blur(14px); z-index: 5; }
+nav .wrap { display: flex; align-items: center; gap: 18px; height: 60px; }
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 640; text-decoration: none; color: inherit; letter-spacing: -.01em; }
+.brand svg { width: 26px; height: 26px; border-radius: 8px; }
+nav .grow { flex: 1; }
+nav a.back { color: var(--ink-2); text-decoration: none; font-size: 14px; }
+nav a.back:hover { color: var(--ink); }
+header { padding: 64px 0 34px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ember); margin: 0 0 12px; }
+h1 { font-size: clamp(30px, 5vw, 44px); line-height: 1.08; letter-spacing: -.03em; margin: 0 0 14px; }
+.lead { font-size: 18px; color: var(--ink-2); margin: 0; max-width: 62ch; }
+h2 { font-size: 20px; letter-spacing: -.018em; margin: 44px 0 10px; }
+h3 { font-size: 15px; margin: 26px 0 6px; }
+p { margin: 0 0 12px; color: var(--ink-2); max-width: 68ch; }
+p strong, li strong { color: var(--ink); font-weight: 560; }
+code { font-family: var(--mono); font-size: 13.5px; background: var(--sunken); padding: 1px 5px; border-radius: 5px; }
+pre {
+  font-family: var(--mono); font-size: 13px; line-height: 1.7; background: var(--paper);
+  border: 1px solid var(--edge); border-radius: 14px; padding: 18px 20px; overflow-x: auto;
+  box-shadow: var(--shadow); margin: 0 0 14px;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+.steps { list-style: none; counter-reset: s; padding: 0; margin: 0 0 8px; }
+.steps li { counter-increment: s; position: relative; padding: 0 0 4px 44px; margin-bottom: 22px; }
+.steps li::before {
+  content: counter(s); position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 9px;
+  display: grid; place-items: center; background: var(--ink); color: var(--canvas);
+  font-family: var(--mono); font-size: 13px; font-weight: 500;
+}
+.steps b { display: block; margin-bottom: 4px; letter-spacing: -.01em; }
+.rule { border: 0; border-top: 1px solid var(--edge); margin: 52px 0 0; }
+.tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+.tabs button {
+  font: inherit; font-size: 13.5px; padding: 6px 13px; border-radius: 9px; cursor: pointer;
+  border: 1px solid transparent; background: none; color: var(--ink-3);
+}
+.tabs button[aria-current="true"] { background: var(--paper); border-color: var(--edge); color: var(--ink); }
+.callout { border: 1px solid var(--edge); border-left: 3px solid var(--ember); border-radius: 12px; padding: 14px 18px; background: var(--paper); margin: 0 0 14px; }
+.callout p:last-child { margin-bottom: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; margin-bottom: 14px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--edge); vertical-align: top; }
+th { font-weight: 560; font-size: 13px; color: var(--ink-3); }
+td:first-child { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+footer { padding: 46px 0 60px; font-size: 13.5px; color: var(--ink-3); display: flex; gap: 20px; flex-wrap: wrap; }
+footer a { color: inherit; text-decoration: none; }
+footer a:hover { color: var(--ink); }
+.hidden { display: none; }
+</style>
+</head>
+<body>
+<nav>
+  <div class="wrap">
+    <a class="brand" href="./">
+      <svg viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="24" fill="#1a1a17"/><g transform="translate(18 18) scale(.64)" fill="none" stroke="#fff" stroke-linecap="round"><path d="M58 18H34a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h24" stroke-width="12"/><path d="M64 40H48a8 8 0 0 0-8 8v4a8 8 0 0 0 8 8h16" stroke-width="10"/></g></svg>
+      Conduit
+    </a>
+    <span class="grow"></span>
+    <a class="back" href="./">Back to the app</a>
+    <a class="back" href="https://github.com/xeniak123/conduit">GitHub</a>
+  </div>
+</nav>
+
+<main class="wrap">
+  <header>
+    <p class="eyebrow">For developers</p>
+    <h1>Connect your app to Conduit</h1>
+    <p class="lead">
+      Your users already have models — cloud keys, and ones running on their own GPU. Instead of asking them for an
+      API key, send them to Conduit and let them grant your app access in one click. The same handshake OpenRouter
+      and ChatGPT use, over loopback, with PKCE.
+    </p>
+  </header>
+
+  <div class="callout">
+    <p><strong>Nothing to register.</strong> There is no developer account, no client secret, and no server in the middle. Conduit runs on the user's machine and answers on <code>http://127.0.0.1:8888</code> by default, once they turn the local API on.</p>
+  </div>
+
+  <h2>The flow</h2>
+  <ol class="steps">
+    <li>
+      <b>Make a verifier, send its hash</b>
+      Generate a random string, hash it with SHA-256, base64url it, and open Conduit's authorize URL in the user's
+      browser with that challenge. Keep the verifier; it never leaves your app.
+    </li>
+    <li>
+      <b>Conduit asks the user</b>
+      Its window comes forward and shows who is asking, what the token allows, and where it will be sent. The browser
+      waits on a small page until they decide.
+    </li>
+    <li>
+      <b>The browser comes back with a code</b>
+      To your <code>redirect_uri</code>, which must be on this machine (<code>http://127.0.0.1:…</code>,
+      <code>http://localhost:…</code>) or your own URL scheme (<code>myapp://…</code>). Conduit refuses to send a code
+      anywhere else, so it can never be used to leak a grant to a website.
+    </li>
+    <li>
+      <b>Your app trades the code for a key</b>
+      One POST, from your program rather than the browser, with the verifier. The code is single use and expires in
+      ten minutes. What comes back is an ordinary Conduit token the user can see and revoke in the app.
+    </li>
+  </ol>
+
+  <h2>Code</h2>
+  <div class="tabs" role="tablist">
+    <button aria-current="true" data-lang="node">Node</button>
+    <button aria-current="false" data-lang="python">Python</button>
+    <button aria-current="false" data-lang="curl">curl</button>
+  </div>
+
+  <pre data-lang="node"><code>import crypto from "node:crypto";
+import http from "node:http";
+
+const base = "http://127.0.0.1:8888";
+const b64 = (b) =&gt; b.toString("base64url");
+const verifier = b64(crypto.randomBytes(32));
+const challenge = b64(crypto.createHash("sha256").update(verifier).digest());
+const state = b64(crypto.randomBytes(16));
+
+// A one-shot listener for the code.
+const code = await new Promise((resolve) =&gt; {
+  const server = http.createServer((req, res) =&gt; {
+    const url = new URL(req.url, "http://localhost:7777");
+    res.end("You can close this tab.");
+    server.close();
+    if (url.searchParams.get("state") === state) resolve(url.searchParams.get("code"));
+  });
+  server.listen(7777, () =&gt; {
+    const params = new URLSearchParams({
+      client_name: "Your App",
+      redirect_uri: "http://127.0.0.1:7777/cb",
+      code_challenge: challenge,
+      code_challenge_method: "S256",
+      state,
+    });
+    open(`${base}/oauth/authorize?${params}`); // your favourite opener
+  });
+});
+
+const { key } = await fetch(`${base}/oauth/token`, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ code, code_verifier: verifier }),
+}).then((r) =&gt; r.json());
+
+// From here on it is an ordinary OpenAI-compatible client.
+const models = await fetch(`${base}/v1/models`, {
+  headers: { authorization: `Bearer ${key}` },
+}).then((r) =&gt; r.json());
+</code></pre>
+
+  <pre class="hidden" data-lang="python"><code>import base64, hashlib, http.server, json, secrets, urllib.parse, urllib.request, webbrowser
+
+BASE = "http://127.0.0.1:8888"
+b64 = lambda raw: base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+verifier = b64(secrets.token_bytes(32))
+challenge = b64(hashlib.sha256(verifier.encode()).digest())
+state = b64(secrets.token_bytes(16))
+
+got = {}
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        got.update({k: v[0] for k, v in query.items()})
+        self.send_response(200); self.end_headers()
+        self.wfile.write(b"You can close this tab.")
+    def log_message(self, *args): pass
+
+server = http.server.HTTPServer(("127.0.0.1", 7777), Handler)
+params = urllib.parse.urlencode({
+    "client_name": "Your App",
+    "redirect_uri": "http://127.0.0.1:7777/cb",
+    "code_challenge": challenge,
+    "code_challenge_method": "S256",
+    "state": state,
+})
+webbrowser.open(f"{BASE}/oauth/authorize?{params}")
+server.handle_request()
+assert got.get("state") == state, "that answer was not for us"
+
+request = urllib.request.Request(
+    f"{BASE}/oauth/token",
+    data=json.dumps({"code": got["code"], "code_verifier": verifier}).encode(),
+    headers={"content-type": "application/json"},
+)
+key = json.load(urllib.request.urlopen(request))["key"]
+print("Conduit key:", key[:9] + "...")
+</code></pre>
+
+  <pre class="hidden" data-lang="curl"><code># Anything that can make a URL and a POST can do this.
+VERIFIER=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')
+CHALLENGE=$(printf %s "$VERIFIER" | openssl dgst -binary -sha256 | base64 | tr '+/' '-_' | tr -d '=')
+
+# 1. Open this in the user's browser:
+echo "http://127.0.0.1:8888/oauth/authorize?client_name=Your%20App\
+&redirect_uri=http://127.0.0.1:7777/cb&code_challenge=$CHALLENGE&code_challenge_method=S256"
+
+# 2. They approve in Conduit; the browser calls your redirect with ?code=...
+
+# 3. Trade it for a key:
+curl -s http://127.0.0.1:8888/oauth/token \
+  -H "content-type: application/json" \
+  -d "{\"code\":\"$CODE\",\"code_verifier\":\"$VERIFIER\"}"
+# {"key":"cnd_...","type":"conduit_api_key"}
+
+# 4. Use it:
+curl -s http://127.0.0.1:8888/v1/chat/completions \
+  -H "authorization: Bearer $KEY" -H "content-type: application/json" \
+  -d '{"model":"local/qwen3-8b","messages":[{"role":"user","content":"hello"}]}'
+</code></pre>
+
+  <h2>Parameters</h2>
+  <table>
+    <tr><th>Name</th><th>What it is</th></tr>
+    <tr><td>client_name</td><td>What the user sees in the approval window. Use your app's real name; it is shown as a claim, not as a fact.</td></tr>
+    <tr><td>redirect_uri</td><td>Where the code is sent. Loopback or your own URL scheme only.</td></tr>
+    <tr><td>code_challenge</td><td>base64url(SHA-256(verifier)), no padding.</td></tr>
+    <tr><td>code_challenge_method</td><td><code>S256</code>.</td></tr>
+    <tr><td>state</td><td>Returned untouched. Check it before spending the code.</td></tr>
+  </table>
+
+  <h2>What the token can do</h2>
+  <p>
+    Everything the local API exposes: <code>/v1/chat/completions</code>, <code>/v1/models</code>,
+    <code>/v1/embeddings</code>, Anthropic's <code>/v1/messages</code>, OpenAI's <code>/v1/responses</code>, and
+    Conduit's <code>/v1/decide</code> for decision models. It cannot read the user's provider keys, their
+    conversations or their files — those never leave Conduit, and the keys never leave the operating system's
+    credential store.
+  </p>
+
+  <h2>If the port is not 8888</h2>
+  <p>
+    Users can change it. Probe the usual suspects with <code>GET /health</code>, which answers
+    <code>{"status":"ok"}</code> without a token, or ask the user for the base URL shown on Conduit's API page.
+  </p>
+
+  <hr class="rule" />
+  <footer>
+    <a href="./">Conduit</a>
+    <a href="https://github.com/xeniak123/conduit">Source</a>
+    <a href="https://github.com/xeniak123/conduit/issues">Report a problem</a>
+  </footer>
+</main>
+
+<script>
+for (const button of document.querySelectorAll(".tabs button")) {
+  button.addEventListener("click", () => {
+    for (const other of document.querySelectorAll(".tabs button")) other.setAttribute("aria-current", String(other === button));
+    for (const block of document.querySelectorAll("pre[data-lang]")) {
+      block.classList.toggle("hidden", block.dataset.lang !== button.dataset.lang);
+    }
+  });
+}
+</script>
+</body>
+</html>

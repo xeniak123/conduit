@@ -16,7 +16,7 @@ use std::io::Read;
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 #[derive(Deserialize, Clone)]
 pub struct Route {
@@ -216,6 +216,15 @@ fn handle(app: AppHandle, config: &Config, mut request: tiny_http::Request) {
         return;
     }
 
+    // Granting another program access happens before the token check, because
+    // this is how a program that has no token gets one. Nothing here reaches a
+    // model, and every grant is decided in Conduit's own window.
+    if path.starts_with("/oauth/") {
+        oauth_route(&app, config, request, &path);
+        log(200, None);
+        return;
+    }
+
     if !authorised(config, &request) {
         let _ = request.respond(error(401, "Missing or invalid API token. Create one in Conduit, API."));
         log(401, None);
@@ -303,6 +312,138 @@ fn handle(app: AppHandle, config: &Config, mut request: tiny_http::Request) {
 }
 
 /// Sends the request on and relays the answer, streaming it when asked to.
+/// One query parameter, percent-decoded.
+fn param(query: &str, name: &str) -> String {
+    query
+        .split('&')
+        .filter_map(|pair| pair.split_once('='))
+        .find(|(k, _)| *k == name)
+        .map(|(_, v)| percent_decode(v))
+        .unwrap_or_default()
+}
+
+fn percent_decode(value: &str) -> String {
+    let bytes = value.replace('+', " ").into_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Ok(byte) = u8::from_str_radix(&String::from_utf8_lossy(&bytes[i + 1..i + 3]), 16) {
+                out.push(byte);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).to_string()
+}
+
+fn html_response(status: u16, body: String) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+    tiny_http::Response::from_string(body)
+        .with_status_code(status)
+        .with_header(header("content-type", "text/html; charset=utf-8"))
+        .with_header(header("cache-control", "no-store"))
+}
+
+#[derive(Serialize, Clone)]
+struct GrantRequest {
+    id: String,
+    client: String,
+    redirect: String,
+}
+
+/// Conduit's half of the OAuth flow other programs use.
+///
+/// `/oauth/authorize` is opened in the browser by the program that wants
+/// access; Conduit asks the user in its own window, and the browser waits on a
+/// page that polls `/oauth/poll`. The key itself is only ever handed over by
+/// `/oauth/token`, in a direct request from the program, in exchange for a
+/// one-time code and the verifier matching the challenge it started with.
+fn oauth_route(app: &AppHandle, config: &Config, request: tiny_http::Request, path: &str) {
+    let query = request.url().split_once('?').map(|(_, q)| q.to_string()).unwrap_or_default();
+
+    match path {
+        "/oauth/authorize" => {
+            let client = param(&query, "client_name");
+            let redirect = param(&query, "redirect_uri");
+            let state = param(&query, "state");
+            let challenge = param(&query, "code_challenge");
+
+            if redirect.is_empty() || !crate::oauth::redirect_allowed(&redirect) {
+                let _ = request.respond(html_response(
+                    400,
+                    "<h1>That redirect is not allowed</h1><p>Conduit only sends a code back to this \
+                     machine, or to the program's own URL scheme.</p>"
+                        .into(),
+                ));
+                return;
+            }
+
+            let client = if client.trim().is_empty() { "An application".to_string() } else { client };
+            let id = crate::oauth::request(&client, &redirect, &state, &challenge);
+            let _ = app.emit(
+                "conduit://oauth-request",
+                GrantRequest { id: id.clone(), client: client.clone(), redirect: redirect.clone() },
+            );
+            // Bring the window forward: the request came from another program,
+            // so nobody is looking at Conduit yet.
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+            let _ = request.respond(html_response(200, crate::oauth::waiting_page(&id, &client, config.port)));
+        }
+
+        "/oauth/poll" => {
+            let id = param(&query, "id");
+            let body = match crate::oauth::peek(&id) {
+                None => serde_json::json!({ "status": "unknown" }),
+                Some((_, redirect, decision, state)) => match decision {
+                    None => serde_json::json!({ "status": "pending" }),
+                    Some(None) => serde_json::json!({ "status": "refused" }),
+                    Some(Some(code)) => {
+                        let joiner = if redirect.contains('?') { '&' } else { '?' };
+                        let mut url = format!("{redirect}{joiner}code={code}");
+                        if !state.is_empty() {
+                            url.push_str(&format!("&state={state}"));
+                        }
+                        serde_json::json!({ "status": "approved", "redirect": url })
+                    }
+                },
+            };
+            let _ = request.respond(json_response(200, body.to_string()).with_header(header("access-control-allow-origin", "*")));
+        }
+
+        "/oauth/token" => {
+            let mut body = String::new();
+            let mut request = request;
+            let _ = request.as_reader().read_to_string(&mut body);
+            let json: serde_json::Value = serde_json::from_str(&body).unwrap_or(serde_json::Value::Null);
+            let code = json.get("code").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let verifier = json.get("code_verifier").and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+            match crate::oauth::exchange(&code, &verifier) {
+                Ok(key) => {
+                    let payload = serde_json::json!({ "key": key, "type": "conduit_api_key" });
+                    let _ = request.respond(
+                        json_response(200, payload.to_string()).with_header(header("access-control-allow-origin", "*")),
+                    );
+                }
+                Err(message) => {
+                    let _ = request.respond(error(400, &message).with_header(header("access-control-allow-origin", "*")));
+                }
+            }
+        }
+
+        _ => {
+            let _ = request.respond(error(404, "No such endpoint."));
+        }
+    }
+}
+
 fn forward(
     request: tiny_http::Request,
     route: &Route,

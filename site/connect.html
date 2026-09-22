@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sign in to Conduit</title>
+<meta name="robots" content="noindex" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%231a1a17'/%3E%3Cg transform='translate(18 18) scale(.64)' fill='none' stroke='%23fff' stroke-linecap='round'%3E%3Cpath d='M58 18H34a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h24' stroke-width='12'/%3E%3Cpath d='M64 40H48a8 8 0 0 0-8 8v4a8 8 0 0 0 8 8h16' stroke-width='10'/%3E%3C/g%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..750&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --canvas: #f6f6f3; --paper: #fff; --ink: #1a1a17; --ink-2: #5e5e57; --ink-3: #98988f;
+  --edge: rgba(20, 20, 16, 0.09); --edge-2: rgba(20, 20, 16, 0.16);
+  --ember: #ff6a1f; --good: #16a172; --bad: #d1443c;
+  --shadow: 0 1px 2px rgba(20, 20, 16, .05), 0 12px 32px -16px rgba(20, 20, 16, .22);
+  --ui: "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #0f0f11; --paper: #18181b; --ink: #f2f2ee; --ink-2: #a3a39c; --ink-3: #6c6c66;
+    --edge: rgba(255, 255, 255, .08); --edge-2: rgba(255, 255, 255, .15);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 32px -16px rgba(0, 0, 0, .8);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --canvas: #0f0f11; --paper: #18181b; --ink: #f2f2ee; --ink-2: #a3a39c; --ink-3: #6c6c66;
+  --edge: rgba(255, 255, 255, .08); --edge-2: rgba(255, 255, 255, .15);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
+  background: var(--canvas); color: var(--ink); font-family: var(--ui);
+  font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+}
+.card {
+  width: 100%; max-width: 420px; background: var(--paper); border: 1px solid var(--edge);
+  border-radius: 18px; padding: 32px; box-shadow: var(--shadow);
+}
+.mark { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; font-weight: 640; letter-spacing: -.01em; }
+.mark svg { width: 28px; height: 28px; border-radius: 8px; }
+h1 { font-size: 22px; line-height: 1.25; letter-spacing: -.022em; margin: 0 0 6px; }
+p.lead { margin: 0 0 22px; color: var(--ink-2); font-size: 14.5px; }
+button, .btn {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+  font: inherit; font-weight: 560; padding: 12px 16px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--edge-2); background: var(--paper); color: var(--ink);
+  transition: transform .12s ease, background .16s ease, border-color .16s ease;
+}
+button:hover { border-color: var(--ink-3); }
+button:active { transform: scale(.985); }
+button[disabled] { opacity: .55; cursor: default; transform: none; }
+button.ink { background: var(--ink); color: var(--canvas); border-color: var(--ink); }
+button + button, form { margin-top: 10px; }
+.sep { display: flex; align-items: center; gap: 12px; margin: 18px 0; color: var(--ink-3); font-size: 12.5px; }
+.sep::before, .sep::after { content: ""; flex: 1; height: 1px; background: var(--edge); }
+input {
+  width: 100%; font: inherit; padding: 12px 14px; border-radius: 12px; margin-bottom: 10px;
+  border: 1px solid var(--edge-2); background: transparent; color: var(--ink);
+}
+input:focus-visible, button:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.note { margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-size: 14px; border: 1px solid var(--edge); }
+.note.ok { border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+.note.bad { border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+.foot { margin-top: 22px; font-size: 12.5px; color: var(--ink-3); display: flex; gap: 8px; align-items: flex-start; }
+.foot svg { width: 14px; height: 14px; flex: none; margin-top: 3px; }
+a { color: inherit; }
+.hidden { display: none; }
+@media (prefers-reduced-motion: reduce) { button { transition: none; } }
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="mark">
+    <svg viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="24" fill="#1a1a17"/><g transform="translate(18 18) scale(.64)" fill="none" stroke="#fff" stroke-linecap="round"><path d="M58 18H34a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h24" stroke-width="12"/><path d="M64 40H48a8 8 0 0 0-8 8v4a8 8 0 0 0 8 8h16" stroke-width="10"/></g></svg>
+    Conduit
+  </div>
+
+  <div id="signin">
+    <h1>Sign in to Conduit</h1>
+    <p class="lead">Conduit is waiting on your computer. Sign in here and it picks the session up by itself — nothing to copy across.</p>
+
+    <button id="google">
+      <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true"><path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.2-.4-4.7H24v8.9h11.8c-.5 2.8-2 5.1-4.4 6.7v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.4z"/><path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.3l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.3 15.4 46 24 46z"/><path fill="#FBBC05" d="M11.8 28.3c-.4-1.3-.7-2.7-.7-4.3s.3-3 .7-4.3v-5.7H4.5A22 22 0 0 0 2 24c0 3.6.9 6.9 2.5 9.9l7.3-5.6z"/><path fill="#EA4335" d="M24 10.5c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 3.9 29.9 2 24 2 15.4 2 8.1 6.7 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9.3 12.2-9.3z"/></svg>
+      Continue with Google
+    </button>
+
+    <div class="sep">or</div>
+
+    <form id="emailform">
+      <input id="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+      <button class="ink" type="submit" id="send">Email me a sign-in link</button>
+    </form>
+
+    <div id="note" class="note hidden"></div>
+
+    <p class="foot">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z"/></svg>
+      <span>No password is ever typed into the Conduit app. An account only syncs your prompts, memories and settings — never your API keys.</span>
+    </p>
+  </div>
+
+  <div id="nodesktop" class="hidden">
+    <h1>Open this from Conduit</h1>
+    <p class="lead">This page finishes a sign-in that the Conduit app starts. Open Conduit, click your name in the sidebar, and choose how you want to sign in.</p>
+    <a class="btn" href="./" style="text-decoration:none">Back to conduit</a>
+  </div>
+</main>
+
+<script>
+const SUPABASE_URL = "https://puzhxhbopgauutdmctut.supabase.co";
+const SUPABASE_KEY = "sb_publishable_q5dMJSk3mFAxDaaF6lXQOQ_NG_rSdyH";
+const RETURN = location.origin + location.pathname;
+const STASH = "conduit.connect.v1";
+
+const note = document.getElementById("note");
+function say(text, ok) {
+  note.textContent = text;
+  note.className = "note " + (ok ? "ok" : "bad");
+}
+
+/**
+ * The app hands its port, its PKCE challenge and its state over in the
+ * fragment, so none of it is ever sent to the server hosting this page. They
+ * are kept for the round trip through Google or an email link, which may come
+ * back in a different tab.
+ */
+function intent() {
+  const fragment = new URLSearchParams(location.hash.slice(1));
+  if (fragment.get("port")) {
+    const value = {
+      port: fragment.get("port"),
+      challenge: fragment.get("challenge") || "",
+      state: fragment.get("state") || "",
+    };
+    try { sessionStorage.setItem(STASH, JSON.stringify(value)); localStorage.setItem(STASH, JSON.stringify(value)); } catch {}
+    history.replaceState(null, "", location.pathname);
+    return value;
+  }
+  const query = new URLSearchParams(location.search);
+  if (query.get("p")) {
+    return { port: query.get("p"), challenge: "", state: query.get("s") || "" };
+  }
+  try {
+    return JSON.parse(sessionStorage.getItem(STASH) || localStorage.getItem(STASH) || "null");
+  } catch { return null; }
+}
+
+const app = intent();
+if (!app || !app.port) {
+  document.getElementById("signin").classList.add("hidden");
+  document.getElementById("nodesktop").classList.remove("hidden");
+}
+
+/** Where Supabase sends the browser back to, carrying the app's port along. */
+function returnUrl() {
+  return `${RETURN}?p=${encodeURIComponent(app.port)}&s=${encodeURIComponent(app.state)}`;
+}
+
+/** The code goes straight to the listener the app opened, and nowhere else. */
+function handOver(code) {
+  const url = new URL(`http://127.0.0.1:${app.port}/callback`);
+  url.searchParams.set("code", code);
+  url.searchParams.set("state", app.state || "");
+  try { sessionStorage.removeItem(STASH); localStorage.removeItem(STASH); } catch {}
+  location.replace(url.toString());
+}
+
+// Coming back from Google, or from the link in an email: the code is in the
+// query, and it belongs to Conduit rather than to this page.
+const back = new URLSearchParams(location.search);
+if (app && back.get("code")) {
+  document.getElementById("signin").innerHTML =
+    "<h1>Sending you back to Conduit</h1><p class='lead'>You can close this tab in a moment.</p>";
+  handOver(back.get("code"));
+} else if (app && (back.get("error") || back.get("error_description"))) {
+  say(back.get("error_description") || back.get("error"), false);
+}
+
+document.getElementById("google")?.addEventListener("click", () => {
+  const params = new URLSearchParams({
+    provider: "google",
+    redirect_to: returnUrl(),
+    code_challenge: app.challenge,
+    code_challenge_method: "s256",
+  });
+  location.href = `${SUPABASE_URL}/auth/v1/authorize?${params}`;
+});
+
+document.getElementById("emailform")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const email = document.getElementById("email").value.trim();
+  const button = document.getElementById("send");
+  if (!email) return;
+  button.disabled = true;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/otp?redirect_to=${encodeURIComponent(returnUrl())}`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        create_user: true,
+        code_challenge: app.challenge,
+        code_challenge_method: "s256",
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.msg || body.error_description || `The server answered ${res.status}.`);
+    }
+    say(`Check ${email}. Open the link on this computer and Conduit signs itself in.`, true);
+    note.classList.remove("hidden");
+  } catch (e) {
+    say(e.message, false);
+    note.classList.remove("hidden");
+  } finally {
+    button.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

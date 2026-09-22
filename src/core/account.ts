@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import { isTauri } from "./host";
+import { signInWithBrowser } from "./oauth";
 import { getSettings, saveSettings, type Settings } from "./config";
 import { useApp } from "./store";
 
@@ -119,51 +120,24 @@ function toSession(json: Record<string, unknown>): Session {
   };
 }
 
-/** Creates an account. Supabase emails a confirmation link before sign-in works. */
-export async function signUp(email: string, password: string): Promise<"confirm" | "signed-in"> {
-  const json = await auth("signup", { email, password });
-  if (json.access_token) {
-    const session = toSession(json);
-    storeSession(session);
-    useAccount.getState().set({ session, error: null });
-    void pull();
-    return "signed-in";
-  }
-  return "confirm";
-}
+/** Where account emails and the account page send people: the website. */
+export const SITE = "https://xeniak123.github.io/conduit/";
 
-export async function signIn(email: string, password: string): Promise<void> {
-  const session = toSession(await auth("token?grant_type=password", { email, password }));
+/**
+ * Signs in, in the browser.
+ *
+ * Conduit has no password field any more. The browser does the signing in —
+ * with Google, or with a link sent to an email address — and hands back a code
+ * that only this app can spend, because only this app has the verifier behind
+ * the challenge it started with. A password never passes through the app, so
+ * there is nothing here for a bad build of it to keep.
+ */
+export async function signInInBrowser(hint?: "google" | "email"): Promise<void> {
+  const { code, verifier } = await signInWithBrowser(hint);
+  const session = toSession(await auth("token?grant_type=pkce", { auth_code: code, code_verifier: verifier }));
   storeSession(session);
   useAccount.getState().set({ session, error: null });
   await pull();
-}
-
-/** Where account emails send people back to: the website, which explains what happened. */
-export const SITE = "https://xeniak123.github.io/conduit/";
-
-/** Emails a link for choosing a new password. Says nothing about whether the address has an account. */
-export async function resetPassword(email: string): Promise<void> {
-  await auth(`recover?redirect_to=${encodeURIComponent(SITE)}`, { email });
-}
-
-/** Sends the confirmation email again, for a link that expired or went to spam. */
-export async function resendConfirmation(email: string): Promise<void> {
-  await auth(`resend?redirect_to=${encodeURIComponent(SITE)}`, { type: "signup", email });
-}
-
-export async function changePassword(password: string): Promise<void> {
-  const session = await fresh();
-  if (!session) throw new Error("Sign in first.");
-  const res = await call(`${CLOUD_URL}/auth/v1/user`, {
-    method: "PUT",
-    headers: { apikey: CLOUD_KEY, authorization: `Bearer ${session.access_token}`, "content-type": "application/json" },
-    body: JSON.stringify({ password }),
-  });
-  if (!res.ok) {
-    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    throw new Error(friendly(String(json.msg ?? json.message ?? `Answered ${res.status}.`)));
-  }
 }
 
 /** Removes everything synced to the account. Local settings stay as they are. */

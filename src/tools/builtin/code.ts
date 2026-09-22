@@ -167,6 +167,7 @@ const editTool: Tool = {
     }
 
     const next = text.slice(0, first) + replace + text.slice(first + find.length);
+    remember(path, text);
     await invoke("fs_write", { path, contents: next });
 
     const line = text.slice(0, first).split("\n").length;
@@ -241,6 +242,205 @@ const testTool: Tool = {
   },
 };
 
+/**
+ * What each file looked like before this conversation touched it.
+ *
+ * An assistant that edits the wrong line is recoverable; one that edits the
+ * wrong line and cannot say what was there before is not. The first version of
+ * a file is kept, so `code.undo` puts it back exactly, with no reliance on git
+ * — plenty of the folders people point Conduit at are not repositories.
+ */
+const original = new Map<string, string>();
+
+function remember(path: string, before: string): void {
+  if (!original.has(path)) original.set(path, before);
+}
+
+const insertTool: Tool = {
+  name: "code.insert",
+  source: "builtin",
+  dangerous: true,
+  description:
+    "Insert new lines into a file after a given line number, or at the end. Use " +
+    "this to add a function, an import or a test — code.edit is for changing text " +
+    "that is already there, and needs an anchor this does not.",
+  parameters: schema(
+    {
+      path: str("File path"),
+      text: str("The lines to insert"),
+      after: {
+        type: "number",
+        description: "Insert after this line, 1-based. 0 puts it at the top; omit for the end.",
+      },
+    },
+    ["path", "text"],
+  ),
+  async run(input) {
+    const path = String(input.path);
+    const addition = String(input.text ?? "");
+    if (!addition.trim()) return "Give the text to insert.";
+
+    const text = await invoke<string>("fs_read", { path, limit: 2_000_000 });
+    const lines = text.split("\n");
+    const at =
+      input.after === undefined ? lines.length : Math.min(Math.max(Number(input.after) || 0, 0), lines.length);
+
+    lines.splice(at, 0, ...addition.split("\n"));
+    remember(path, text);
+    await invoke("fs_write", { path, contents: lines.join("\n") });
+    return `Inserted ${addition.split("\n").length} line(s) into ${path} after line ${at}.`;
+  },
+};
+
+const undoTool: Tool = {
+  name: "code.undo",
+  source: "builtin",
+  dangerous: true,
+  description:
+    "Put a file back the way it was before this conversation edited it. Use when " +
+    "an edit turned out to be wrong, instead of trying to edit it back by hand.",
+  parameters: schema({ path: str("File path. Omit to list what can be undone.") }),
+  async run(input) {
+    const path = String(input.path ?? "").trim();
+    if (!path) {
+      return original.size
+        ? `Files this conversation changed:\n${[...original.keys()].join("\n")}`
+        : "Nothing has been edited in this conversation.";
+    }
+    const before = original.get(path);
+    if (before === undefined) return `${path} has not been edited in this conversation.`;
+    await invoke("fs_write", { path, contents: before });
+    original.delete(path);
+    return `Put ${path} back the way it was.`;
+  },
+};
+
+const diffTool: Tool = {
+  name: "code.diff",
+  source: "builtin",
+  description:
+    "Show what has changed in the project but is not committed yet. Read-only. Use " +
+    "before finishing, to check that what you changed is what you meant to.",
+  parameters: schema({
+    path: str("Limit to one file or folder"),
+    stat: { type: "boolean", description: "Only the per-file summary, not the lines" },
+  }),
+  async run(input) {
+    const cwd = projectRoot();
+    if (!cwd) return "No project is open. Set one in Settings → Projects.";
+    const target = String(input.path ?? "").trim();
+    const result = await shell(`git diff ${input.stat ? "--stat" : "--unified=3"} -- ${target || "."}`, cwd);
+    if (result.code !== 0) return "This folder is not a git repository, so there is nothing to compare against.";
+    if (!result.out) return "No uncommitted changes.";
+    const lines = result.out.split("\n");
+    return lines.length > 200
+      ? `${lines.slice(0, 200).join("\n")}\n\n[truncated — ask for one path, or pass stat]`
+      : result.out;
+  },
+};
+
+/**
+ * Definitions in a file, without reading the file.
+ *
+ * Deliberately a regular expression rather than a parser: it has to work on
+ * whatever the user has open, including languages nothing is installed for, and
+ * a list of names and line numbers is enough to decide what to read next.
+ */
+const DEFINITION =
+  /^\s*(?:export\s+)?(?:pub\s+|public\s+|private\s+|protected\s+|static\s+|async\s+|default\s+)*(?:function|fn|def|class|struct|enum|trait|impl|interface|type|const|let|var)\s+([A-Za-z_$][\w$]*)/;
+
+const outlineTool: Tool = {
+  name: "code.outline",
+  source: "builtin",
+  description:
+    "List what a file defines — functions, types, classes — with line numbers. " +
+    "Read-only. Cheaper than reading a long file when you only need to find the " +
+    "part that matters.",
+  parameters: schema({ path: str("File path") }, ["path"]),
+  async run(input) {
+    const path = String(input.path);
+    const text = await invoke<string>("fs_read", { path, limit: 2_000_000 });
+    const found: string[] = [];
+    text.split("\n").forEach((line, i) => {
+      if (DEFINITION.test(line)) found.push(`${String(i + 1).padStart(5)}  ${line.trim().slice(0, 100)}`);
+    });
+    if (!found.length) return `Nothing that looks like a definition in ${path}. Read it instead.`;
+    return `${path}\n\n${found.slice(0, 200).join("\n")}`;
+  },
+};
+
+/** Manifests worth looking for, and what each one means. */
+const MANIFESTS = [
+  ["package.json", "Node"],
+  ["Cargo.toml", "Rust"],
+  ["pyproject.toml", "Python"],
+  ["requirements.txt", "Python"],
+  ["go.mod", "Go"],
+  ["pom.xml", "Java"],
+  ["Gemfile", "Ruby"],
+  ["composer.json", "PHP"],
+] as const;
+
+/**
+ * The orientation step, in one call.
+ *
+ * Without it a run spends three or four calls working out what kind of project
+ * this is, and still guesses the test command wrong. This reads the manifests
+ * the project actually has and says what it found.
+ */
+const contextTool: Tool = {
+  name: "code.context",
+  source: "builtin",
+  description:
+    "What kind of project this is: its manifests, its scripts, its test command " +
+    "and what is currently uncommitted. Read-only. Call this first in an " +
+    "unfamiliar codebase.",
+  parameters: schema({ path: str("Folder. Defaults to the active project.") }),
+  async run(input) {
+    const cwd = projectRoot(input.path);
+    if (!cwd) return "No project is open. Set one in Settings → Projects, or pass a path.";
+
+    const out: string[] = [`Project: ${cwd}`];
+
+    for (const [file, stack] of MANIFESTS) {
+      try {
+        const text = await invoke<string>("fs_read", { path: `${cwd}/${file}`, limit: 40_000 });
+        out.push(`\n${file} (${stack})`);
+        if (file === "package.json") {
+          const parsed = JSON.parse(text) as { scripts?: Record<string, string> };
+          const scripts = Object.entries(parsed.scripts ?? {});
+          if (scripts.length) out.push(...scripts.map(([name, body]) => `  npm run ${name} → ${body}`));
+        }
+      } catch {
+        // Not that kind of project. That is an answer too.
+      }
+    }
+
+    const configured = getSettings().code.testCommand.trim();
+    if (configured) out.push(`\nTest command set in Settings: ${configured}`);
+
+    const status = await shell("git status --short --branch", cwd);
+    out.push(
+      status.code === 0
+        ? `\ngit\n${status.out.split("\n").slice(0, 30).join("\n")}`
+        : "\nNot a git repository — there is nothing to fall back on if an edit is wrong.",
+    );
+
+    return out.join("\n");
+  },
+};
+
 export function registerCodeTools(): void {
-  register(searchTool, readTool, editTool, treeTool, testTool);
+  register(
+    searchTool,
+    readTool,
+    editTool,
+    treeTool,
+    testTool,
+    insertTool,
+    undoTool,
+    diffTool,
+    outlineTool,
+    contextTool,
+  );
 }

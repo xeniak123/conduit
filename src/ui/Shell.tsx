@@ -7,6 +7,7 @@ import { stopRun } from "@/core/chat";
 import { exportConversation } from "@/core/export";
 import { activeConversation, useApp } from "@/core/store";
 import { ApprovalSheet } from "./ApprovalSheet";
+import { GrantSheet } from "./GrantSheet";
 import { CommandPalette } from "./CommandPalette";
 import { Onboarding, useFirstRun } from "./Onboarding";
 import { Chat } from "./Chat";
@@ -150,6 +151,7 @@ export function Shell() {
       <Settings />
       <UpdateBanner />
       <ApprovalSheet />
+      <GrantSheet />
     </div>
   );
 }

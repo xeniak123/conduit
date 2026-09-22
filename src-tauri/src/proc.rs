@@ -570,9 +570,15 @@ fn memory_mb() -> u64 {
 
 // --- coding agents in a terminal ------------------------------------------------
 
-/// Programs Conduit will open in a terminal for the Agents page. A fixed list:
-/// the page composes the environment, never the program.
-const AGENTS: &[&str] = &["claude", "codex", "opencode", "aider", "goose", "crush", "qwen", "gemini", "hermes", "openclaw"];
+/// Programs Conduit will open in a terminal for the Agents page, plus the two
+/// interpreters the fine-tuning page runs its generated script with. A fixed
+/// list: the page composes the environment and the arguments, never the
+/// program, and a training run belongs in a terminal the user can watch and
+/// close rather than inside the app.
+const AGENTS: &[&str] = &[
+    "claude", "codex", "opencode", "aider", "goose", "crush", "qwen", "gemini", "hermes", "openclaw", "python",
+    "python3",
+];
 
 /// Where a program is on PATH, if anywhere.
 pub fn which(program: &str) -> Option<String> {

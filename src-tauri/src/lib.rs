@@ -3,6 +3,7 @@ mod audio;
 mod companion;
 mod host;
 mod inject;
+mod oauth;
 mod pointer;
 mod proc;
 mod proxy;
@@ -442,6 +443,38 @@ async fn gpu_info() -> Result<proc::Gpu, String> {
     tauri::async_runtime::spawn_blocking(proc::gpu).await.map_err(|e| e.to_string())
 }
 
+/// Starts listening on loopback for a browser sign-in and returns the port.
+///
+/// The browser is opened by the web layer immediately afterwards, with this
+/// port in the redirect address. Whatever comes back arrives as one event, so
+/// the window never has to poll.
+#[tauri::command]
+async fn auth_listen(app: AppHandle) -> Result<u16, String> {
+    let (port, rx) = tauri::async_runtime::spawn_blocking(oauth::listen_once)
+        .await
+        .map_err(|e| e.to_string())??;
+
+    std::thread::spawn(move || {
+        let payload = match rx.recv() {
+            Ok(Ok(query)) => serde_json::json!({ "query": query }),
+            Ok(Err(message)) => serde_json::json!({ "error": message }),
+            Err(_) => serde_json::json!({ "error": "The sign-in was cancelled." }),
+        };
+        let _ = app.emit("conduit://auth-callback", payload);
+    });
+
+    Ok(port)
+}
+
+/// The window's answer to another program's request for access.
+///
+/// `key` is the API key the web layer just created for it; Conduit holds it
+/// only until the program exchanges its code, and never shows it to a browser.
+#[tauri::command]
+fn oauth_decide(id: String, key: Option<String>) -> Result<String, String> {
+    oauth::decide(&id, key)
+}
+
 #[tauri::command]
 fn api_start(app: AppHandle, config: api::Config, state: State<'_, AppState>) -> Result<u16, String> {
     state.api.start(app, config)
@@ -577,6 +610,8 @@ pub fn run() {
             machine_info,
             gpu_info,
             download_cancel,
+            auth_listen,
+            oauth_decide,
             api_start,
             api_stop,
             api_port,

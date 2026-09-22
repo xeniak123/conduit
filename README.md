@@ -47,6 +47,11 @@ Everything a chat can do is switched right where you type:
 - Every tool call can be written to an audit log, with secrets redacted.
 - Extensions and pets never run downloaded code inside the app.
 - The optional account syncs prompts, memories and settings. Never keys.
+- Signing in happens in your browser, not in the app: Conduit has no password
+  field, and only a one-time code comes back to it.
+- Another program can be granted access with one approval instead of a pasted
+  key. What it gets is a revokable token, never your provider keys. See
+  [Connect your app](https://xeniak123.github.io/conduit/oauth.html).
 
 ## Running it
 

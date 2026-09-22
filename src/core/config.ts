@@ -70,6 +70,8 @@ export const PROFILES: Record<
       "fs.write",
       "fs.delete",
       "code.edit",
+      "code.insert",
+      "code.undo",
       "code.test",
       "screen.click",
       "screen.type",

@@ -84,6 +84,7 @@ export function ApiPage() {
   };
 
   const example = sample(lang, base, model, token);
+  const grantSample = grantFlow(base);
 
   return (
     <div className="page">
@@ -211,6 +212,28 @@ export function ApiPage() {
       </section>
 
       <section className="block">
+        <h3 className="block__title">Let an app connect itself</h3>
+        <div className="card">
+          <p className="muted">
+            Instead of asking people to paste a token, another program can send them here and be granted one — the
+            same handshake OpenRouter and ChatGPT use. Conduit asks in its own window, the program never sees a
+            password, and what it gets is an ordinary token you can revoke above.
+          </p>
+          <div className="codebox">
+            <button className="codebox__copy btn btn--small" onPointerDown={() => copy(grantSample, "grant")}>
+              {copied === "grant" ? <Icon.check /> : <Icon.copy />}
+              {copied === "grant" ? "Copied" : "Copy"}
+            </button>
+            <pre>{grantSample}</pre>
+          </div>
+          <p className="muted">
+            The code is worth nothing without the verifier behind the challenge, it can be spent once, and it expires
+            in ten minutes. Conduit sends it back only to this machine or to the program's own URL scheme.
+          </p>
+        </div>
+      </section>
+
+      <section className="block">
         <h3 className="block__title">Access</h3>
         <div className="card">
           <Setting label="Programs on this computer need no token" help="Convenient for local tools. Requests from other devices always need one.">
@@ -277,6 +300,32 @@ export function ApiPage() {
       </section>
     </div>
   );
+}
+
+/**
+ * How another program asks for access.
+ *
+ * Written as three shell steps rather than prose because that is the shape the
+ * person reading it will paste somewhere, and because it makes the one rule
+ * obvious: the key is fetched by the program, never handed to a browser.
+ */
+function grantFlow(base: string): string {
+  const root = base.replace(/\/v1$/, "");
+  return [
+    "# 1. Send the user's browser here (challenge = base64url(sha256(verifier)))",
+    `${root}/oauth/authorize?client_name=Your%20App&redirect_uri=http://localhost:7777/cb`,
+    "  &code_challenge=$CHALLENGE&code_challenge_method=S256&state=$STATE",
+    "",
+    "# 2. Conduit asks the user. On approval the browser comes back to",
+    "#    http://localhost:7777/cb?code=...&state=...",
+    "",
+    "# 3. Your program trades the code for a key, once:",
+    `curl ${root}/oauth/token \\`,
+    '  -H "content-type: application/json" \\',
+    `  -d '{"code":"$CODE","code_verifier":"$VERIFIER"}'`,
+    "",
+    '# {"key":"cnd_..."} \u2014 send it as Authorization: Bearer from then on.',
+  ].join("\n");
 }
 
 function sample(lang: Lang, base: string, model: string, token: string): string {

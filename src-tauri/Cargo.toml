@@ -1,6 +1,6 @@
 [package]
 name = "conduit"
-version = "0.3.7"
+version = "0.3.8"
 description = "Voice-driven agent that lives in your tray"
 authors = ["Conduit contributors"]
 edition = "2021"
@@ -38,6 +38,7 @@ futures-util = { version = "0.3.34", default-features = false, features = ["std"
 tauri-plugin-notification = "^2"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 sha2 = "0.10"
+rand = "0.8"
 flate2 = "1"
 tar = "0.4"
 tiny_http = "0.12"
