@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { register, schema, str, type Tool } from "../registry";
+import { snapshotBefore } from "@/core/checkpoints";
 
 /**
  * Files and folders.
@@ -40,11 +41,13 @@ const writeTool: Tool = {
     { path: str("File path"), contents: str("Full text contents of the file") },
     ["path", "contents"],
   ),
-  run: (input) =>
-    invoke<string>("fs_write", {
+  async run(input, ctx) {
+    await snapshotBefore(ctx.conversationId, String(input.path));
+    return invoke<string>("fs_write", {
       path: String(input.path),
       contents: String(input.contents ?? ""),
-    }),
+    });
+  },
 };
 
 const readTool: Tool = {

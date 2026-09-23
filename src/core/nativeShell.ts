@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isTauri } from "./host";
 
@@ -74,6 +75,22 @@ export function installNativeShell(): () => void {
 
   // Middle-click paste-and-go, back/forward mouse buttons.
   on("auxclick", (e) => e.preventDefault());
+
+  // A link in a reply, a model card or a help text opens in the user's own
+  // browser. Left to the webview, target=_blank either did nothing or opened
+  // a bare, chromeless window that looked like part of Conduit.
+  on(
+    "click",
+    (e) => {
+      const anchor = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!anchor) return;
+      const href = anchor.getAttribute("href") ?? "";
+      if (!/^(https?:|mailto:)/i.test(href)) return;
+      e.preventDefault();
+      void invoke("open_target", { target: href }).catch(() => undefined);
+    },
+    { capture: true },
+  );
 
   return () => disposers.forEach((d) => d());
 }

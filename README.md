@@ -18,7 +18,9 @@ No account needed.
 
 | You would otherwise use | In Conduit |
 | --- | --- |
-| ChatGPT, Claude | Chat with memory, projects, file and image attachments, live HTML previews. Import your old chats from ChatGPT and Claude exports. |
+| ChatGPT, Claude | Chat with memory, projects, file and image attachments, tables, maths (LaTeX), live HTML previews, branching, pinned and renamed chats, and a meter for how much of the conversation the model sees. Import your old chats from ChatGPT and Claude exports. |
+| Cline, Cursor's agent | **Code mode**: the agent reads, searches, edits and runs your tests. **Plan** first and nothing changes until you say go; every edit is approved as a diff; every reply that changed files can be reviewed and undone in one click. |
+| Colab notebooks for fine-tuning | **Fine-tune**: training data from Hugging Face, a file or your own chats; LoRA, QLoRA or full; a memory check against your GPU; a plain script you can read. |
 | OpenRouter and every provider's console | One switcher with every model your keys unlock: Anthropic, OpenAI, Gemini, OpenRouter, Hugging Face, Groq, DeepSeek, Mistral, xAI and more. |
 | LM Studio, Ollama | **Model hub**: search Hugging Face, pick a quantization, see whether it fits your GPU before downloading, load it with one click. |
 | Unsloth start, manual env vars | **Agents**: open Claude Code, Codex, OpenCode, Aider or Goose on any model in Conduit, including a local one, without touching their config. |

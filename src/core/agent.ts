@@ -61,11 +61,15 @@ export async function runAgent(
   const command = settings.command;
   // Search is a switch in the message box; off means the model never sees
   // the web tools at all rather than seeing them and being refused.
+  // Plan mode keeps only what cannot change anything: the model can look as
+  // much as it likes, and the first write happens after the user says go.
+  const planning = Boolean(settings.code.enabled && settings.code.plan);
   const specs = () =>
     toolSpecs().filter(
       (t) =>
         (settings.webSearch !== false || !t.name.startsWith("web.")) &&
-        (settings.computerUse.enabled || !t.name.startsWith("screen.")),
+        (settings.computerUse.enabled || !t.name.startsWith("screen.")) &&
+        (!planning || (!getTool(t.name)?.dangerous && !t.name.startsWith("screen."))),
     );
   const provider = withFallback(
     getProvider(command.provider, settings),
@@ -513,6 +517,22 @@ function systemPrompt(ctx: ToolContext, settings: Settings): string {
       "catch an edit that went somewhere you did not mean. code.undo puts a file",
       "back if it did.",
     );
+
+    if (settings.code.plan) {
+      base.push(
+        "",
+        "PLAN MODE",
+        "You can read, search and run read-only checks, but you cannot change",
+        "anything in this turn: the tools that write are not available. Investigate",
+        "as much as the task needs, then answer with a plan:",
+        "- a one-line summary of what you will do,",
+        "- the files you will change and what changes in each,",
+        "- how you will check it worked,",
+        "- anything you are unsure of, as a question.",
+        "Do not write the code for the changes yet. The user will approve the plan",
+        "and you will carry it out in the next turn.",
+      );
+    }
 
     const test = settings.code.testCommand.trim();
     if (test) {

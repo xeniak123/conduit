@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { AnimatePresence, motion } from "motion/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -11,22 +11,25 @@ import { GrantSheet } from "./GrantSheet";
 import { CommandPalette } from "./CommandPalette";
 import { Onboarding, useFirstRun } from "./Onboarding";
 import { Chat } from "./Chat";
-import { ApiPage } from "./ApiPage";
-import { CompanionPage } from "./CompanionPage";
-import { ModelHub } from "./ModelHub";
 import { ModelSwitch } from "./ModelSwitch";
-import { ProjectsPage } from "./ProjectsPage";
-import { ScheduledPage } from "./ScheduledPage";
-import { AgentsPage } from "./AgentsPage";
-import { DecidePage } from "./DecidePage";
-import { ArenaPage } from "./ArenaPage";
-import { TunePage } from "./TunePage";
-import { StorePage } from "./StorePage";
 import { Settings } from "./Settings";
 import { Sidebar } from "./Sidebar";
 import { UpdateBanner } from "./UpdateBanner";
 import { Icon } from "./icons";
 import { SPRING } from "./motion";
+
+// Pages other than the chat load when first opened, so the window that opens
+// on every start carries only what it shows.
+const ApiPage = lazy(() => import("./ApiPage").then((m) => ({ default: m.ApiPage })));
+const CompanionPage = lazy(() => import("./CompanionPage").then((m) => ({ default: m.CompanionPage })));
+const ModelHub = lazy(() => import("./ModelHub").then((m) => ({ default: m.ModelHub })));
+const ProjectsPage = lazy(() => import("./ProjectsPage").then((m) => ({ default: m.ProjectsPage })));
+const ScheduledPage = lazy(() => import("./ScheduledPage").then((m) => ({ default: m.ScheduledPage })));
+const AgentsPage = lazy(() => import("./AgentsPage").then((m) => ({ default: m.AgentsPage })));
+const DecidePage = lazy(() => import("./DecidePage").then((m) => ({ default: m.DecidePage })));
+const ArenaPage = lazy(() => import("./ArenaPage").then((m) => ({ default: m.ArenaPage })));
+const TunePage = lazy(() => import("./TunePage").then((m) => ({ default: m.TunePage })));
+const StorePage = lazy(() => import("./StorePage").then((m) => ({ default: m.StorePage })));
 
 export function Shell() {
   const conversation = useApp(activeConversation);
@@ -132,6 +135,7 @@ export function Shell() {
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.16, ease: [0.2, 0.8, 0.2, 1] }}
           >
+            <Suspense fallback={<div className="page page--loading" aria-busy="true" />}>
             {page === "chat" && <Chat />}
             {page === "models" && <ModelHub />}
             {page === "store" && <StorePage />}
@@ -143,6 +147,7 @@ export function Shell() {
             {page === "decide" && <DecidePage />}
             {page === "arena" && <ArenaPage />}
             {page === "tune" && <TunePage />}
+            </Suspense>
           </motion.main>
         </AnimatePresence>
 

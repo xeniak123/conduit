@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getSettings } from "@/core/config";
 import { register, schema, str, type Tool } from "../registry";
+import { rememberBefore, snapshotBefore } from "@/core/checkpoints";
 
 /**
  * Working in a codebase.
@@ -134,7 +135,7 @@ const editTool: Tool = {
     },
     ["path", "find", "replace"],
   ),
-  async run(input) {
+  async run(input, ctx) {
     const path = String(input.path);
     const find = String(input.find ?? "");
     const replace = String(input.replace ?? "");
@@ -168,6 +169,7 @@ const editTool: Tool = {
 
     const next = text.slice(0, first) + replace + text.slice(first + find.length);
     remember(path, text);
+    rememberBefore(ctx.conversationId, path, text);
     await invoke("fs_write", { path, contents: next });
 
     const line = text.slice(0, first).split("\n").length;
@@ -275,7 +277,7 @@ const insertTool: Tool = {
     },
     ["path", "text"],
   ),
-  async run(input) {
+  async run(input, ctx) {
     const path = String(input.path);
     const addition = String(input.text ?? "");
     if (!addition.trim()) return "Give the text to insert.";
@@ -287,6 +289,7 @@ const insertTool: Tool = {
 
     lines.splice(at, 0, ...addition.split("\n"));
     remember(path, text);
+    rememberBefore(ctx.conversationId, path, text);
     await invoke("fs_write", { path, contents: lines.join("\n") });
     return `Inserted ${addition.split("\n").length} line(s) into ${path} after line ${at}.`;
   },
@@ -300,7 +303,7 @@ const undoTool: Tool = {
     "Put a file back the way it was before this conversation edited it. Use when " +
     "an edit turned out to be wrong, instead of trying to edit it back by hand.",
   parameters: schema({ path: str("File path. Omit to list what can be undone.") }),
-  async run(input) {
+  async run(input, ctx) {
     const path = String(input.path ?? "").trim();
     if (!path) {
       return original.size
@@ -309,6 +312,7 @@ const undoTool: Tool = {
     }
     const before = original.get(path);
     if (before === undefined) return `${path} has not been edited in this conversation.`;
+    await snapshotBefore(ctx.conversationId, path);
     await invoke("fs_write", { path, contents: before });
     original.delete(path);
     return `Put ${path} back the way it was.`;

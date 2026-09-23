@@ -1,135 +1,100 @@
+import { Marked, type Token, type TokenizerExtension } from "marked";
+
 /**
  * The Markdown reader behind assistant replies.
  *
- * Deliberately small rather than a library: replies are short prose with the
- * occasional code block or list, and a full parser plus a syntax highlighter
- * would outweigh the entire rest of the interface. Anything it does not
- * understand falls through as plain text, which is always safe.
+ * Replies are no longer "short prose with the occasional list": models answer
+ * in tables, nested lists, task lists, maths and long code, and a hand-rolled
+ * reader that knew six constructs showed the rest as raw pipes and dollar
+ * signs. This is `marked`'s lexer (CommonMark plus GitHub's tables, task
+ * lists and strikethrough) with one addition, TeX maths, turned into tokens
+ * that the view renders itself. Nothing here produces HTML, so nothing a model
+ * writes can become markup in the app.
  */
 
-export type Block =
-  | { kind: "code"; lang: string; body: string }
-  | { kind: "heading"; level: number; body: string }
-  | { kind: "list"; ordered: boolean; items: string[] }
-  | { kind: "quote"; body: string }
-  | { kind: "para"; body: string };
+export type { Token };
 
-export type InlinePart =
-  | { type: "text" | "code" | "bold" | "em"; text: string }
-  | { type: "link"; text: string; href: string };
-
-const INLINE = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(\[[^\]]+\]\([^)]+\))/g;
-
-export function splitInline(text: string): InlinePart[] {
-  const parts: InlinePart[] = [];
-  let last = 0;
-
-  for (const match of text.matchAll(INLINE)) {
-    const index = match.index ?? 0;
-    if (index > last) parts.push({ type: "text", text: text.slice(last, index) });
-
-    const token = match[0];
-    if (token.startsWith("`")) {
-      parts.push({ type: "code", text: token.slice(1, -1) });
-    } else if (token.startsWith("**")) {
-      parts.push({ type: "bold", text: token.slice(2, -2) });
-    } else if (token.startsWith("[")) {
-      const split = token.indexOf("](");
-      parts.push({
-        type: "link",
-        text: token.slice(1, split),
-        href: token.slice(split + 2, -1),
-      });
-    } else {
-      parts.push({ type: "em", text: token.slice(1, -1) });
-    }
-    last = index + token.length;
-  }
-
-  if (last < text.length) parts.push({ type: "text", text: text.slice(last) });
-  return parts;
+export interface MathToken {
+  type: "mathBlock" | "mathInline";
+  raw: string;
+  text: string;
+  display?: boolean;
 }
 
-export function parse(text: string): Block[] {
-  const blocks: Block[] = [];
-  const lines = text.split("\n");
-  let i = 0;
+/** `$$ … $$` and `\[ … \]` on their own lines. */
+const mathBlock: TokenizerExtension = {
+  name: "mathBlock",
+  level: "block",
+  start(src) {
+    const i = src.search(/\$\$|\\\[/);
+    return i < 0 ? undefined : i;
+  },
+  tokenizer(src) {
+    const match = /^\$\$([\s\S]+?)\$\$[ \t]*(?:\n+|$)/.exec(src) ?? /^\\\[([\s\S]+?)\\\][ \t]*(?:\n+|$)/.exec(src);
+    if (match) return { type: "mathBlock", raw: match[0], text: match[1].trim() };
+    return undefined;
+  },
+};
 
-  while (i < lines.length) {
-    const line = lines[i];
+/**
+ * `$ … $`, `\( … \)` and `$$ … $$` inside a sentence.
+ *
+ * The single-dollar form follows the rule most renderers use so that prices
+ * survive: the opening dollar is followed by a non-space, the closing one is
+ * preceded by a non-space and not followed by a digit. "$5 and $10" stays
+ * text; "$x^2$" is maths.
+ */
+const mathInline: TokenizerExtension = {
+  name: "mathInline",
+  level: "inline",
+  start(src) {
+    const i = src.search(/\$|\\\(/);
+    return i < 0 ? undefined : i;
+  },
+  tokenizer(src) {
+    let match = /^\\\(([\s\S]+?)\\\)/.exec(src);
+    if (match) return { type: "mathInline", raw: match[0], text: match[1].trim() };
+    match = /^\$\$([^$]+?)\$\$/.exec(src);
+    if (match) return { type: "mathInline", raw: match[0], text: match[1].trim(), display: true };
+    match = /^\$(?=\S)([^$\n]*?\S)\$(?!\d)/.exec(src);
+    if (match) return { type: "mathInline", raw: match[0], text: match[1] };
+    return undefined;
+  },
+};
 
-    // Fenced code. An unterminated fence runs to the end rather than
-    // swallowing the rest of the reply into nothing.
-    if (line.trimStart().startsWith("```")) {
-      const lang = line.trim().slice(3).trim();
-      const body: string[] = [];
-      i++;
-      while (i < lines.length && !lines[i].trimStart().startsWith("```")) {
-        body.push(lines[i]);
-        i++;
-      }
-      i++;
-      blocks.push({ kind: "code", lang, body: body.join("\n") });
-      continue;
-    }
+const reader = new Marked({ gfm: true, breaks: true });
+reader.use({ extensions: [mathBlock, mathInline] });
 
-    const heading = /^(#{1,4})\s+(.*)$/.exec(line);
-    if (heading) {
-      blocks.push({ kind: "heading", level: heading[1].length, body: heading[2] });
-      i++;
-      continue;
-    }
-
-    if (/^\s*>\s?/.test(line)) {
-      const body: string[] = [];
-      while (i < lines.length && /^\s*>\s?/.test(lines[i])) {
-        body.push(lines[i].replace(/^\s*>\s?/, ""));
-        i++;
-      }
-      blocks.push({ kind: "quote", body: body.join(" ") });
-      continue;
-    }
-
-    const bullet = /^\s*[-*+]\s+(.*)$/.exec(line);
-    const numbered = /^\s*\d+[.)]\s+(.*)$/.exec(line);
-    if (bullet || numbered) {
-      const ordered = Boolean(numbered);
-      const items: string[] = [];
-      while (i < lines.length) {
-        const next = ordered
-          ? /^\s*\d+[.)]\s+(.*)$/.exec(lines[i])
-          : /^\s*[-*+]\s+(.*)$/.exec(lines[i]);
-        if (!next) break;
-        items.push(next[1]);
-        i++;
-      }
-      blocks.push({ kind: "list", ordered, items });
-      continue;
-    }
-
-    if (!line.trim()) {
-      i++;
-      continue;
-    }
-
-    // Consecutive non-blank lines form one paragraph, as in Markdown proper.
-    const body: string[] = [];
-    while (i < lines.length && lines[i].trim() && !isBlockStart(lines[i])) {
-      body.push(lines[i]);
-      i++;
-    }
-    blocks.push({ kind: "para", body: body.join("\n") });
+export function lex(text: string): Token[] {
+  try {
+    return reader.lexer(text);
+  } catch {
+    // A reader must never take a reply down with it: the text as a paragraph
+    // is always a correct, if plain, rendering.
+    return [{ type: "paragraph", raw: text, text, tokens: [{ type: "text", raw: text, text }] } as Token];
   }
-
-  return blocks;
 }
 
-function isBlockStart(line: string): boolean {
-  return (
-    line.trimStart().startsWith("```") ||
-    /^(#{1,4})\s+/.test(line) ||
-    /^\s*>\s?/.test(line) ||
-    /^\s*[-*+]\s+/.test(line) ||
-    /^\s*\d+[.)]\s+/.test(line)
-  );
+/**
+ * Only links that go somewhere safe. A model can be talked into writing
+ * `javascript:` or `file:` links by whatever it just read on the web.
+ */
+export function safeHref(href: string | undefined | null): string | null {
+  if (!href) return null;
+  const trimmed = href.trim();
+  return /^(https?:|mailto:)/i.test(trimmed) ? trimmed : null;
+}
+
+const NAMED: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'" };
+
+/** Text tokens keep entities as written; the view shows what they stand for. */
+export function decodeEntities(text: string): string {
+  if (!text.includes("&")) return text;
+  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+|#39);/gi, (whole, body: string) => {
+    if (body[0] === "#" && body !== "#39") {
+      const code = body[1] === "x" || body[1] === "X" ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+      return Number.isFinite(code) && code > 0 && code < 0x110000 ? String.fromCodePoint(code) : whole;
+    }
+    return NAMED[body.toLowerCase()] ?? whole;
+  });
 }

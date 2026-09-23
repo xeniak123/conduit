@@ -22,6 +22,9 @@ export function Chat() {
   const conversation = useApp(activeConversation);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
+  // Mirrors pinnedRef for rendering: the "jump to latest" button appears once
+  // the reader has scrolled away from the end.
+  const [away, setAway] = useState(false);
   const messages = conversation?.messages ?? [];
   const lastId = messages[messages.length - 1]?.id;
   const lastLength = messages[messages.length - 1]?.text.length ?? 0;
@@ -47,7 +50,24 @@ export function Chat() {
     const el = scrollRef.current;
     if (!el) return;
     pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    setAway(!pinnedRef.current);
   };
+
+  const toBottom = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    pinnedRef.current = true;
+    setAway(false);
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  };
+
+  // A different chat always opens at its end.
+  useEffect(() => {
+    pinnedRef.current = true;
+    setAway(false);
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [conversation?.id]);
 
   return (
     <>
@@ -64,6 +84,23 @@ export function Chat() {
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {away && messages.length > 0 && (
+          <motion.button
+            className="jumpdown"
+            aria-label="Jump to the latest message"
+            title="Jump to the latest message"
+            initial={{ opacity: 0, y: 8, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.9 }}
+            transition={SPRING}
+            onPointerDown={toBottom}
+          >
+            <Icon.chevron />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       <Composer />
     </>

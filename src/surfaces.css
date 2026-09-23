@@ -489,3 +489,185 @@
     display: none;
   }
 }
+
+/* ============ markdown: the rest of what models write ============ */
+
+/* Line breaks arrive as <br> from the reader now; pre-wrap on top of that
+   doubled every one of them. */
+.md__p {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.md__raw {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  color: var(--text-2);
+  white-space: pre-wrap;
+}
+
+.md__h {
+  line-height: 1.3;
+}
+
+h3.md__h {
+  font-size: 17px;
+}
+
+h4.md__h {
+  font-size: 15.5px;
+}
+
+h5.md__h,
+h6.md__h {
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.md__li > .md__p {
+  margin-bottom: 4px;
+}
+
+.md__li > .md__list {
+  margin: 4px 0 2px;
+}
+
+.md__list--loose > li {
+  margin-bottom: 8px;
+}
+
+.md__list--tasks {
+  list-style: none;
+  padding-left: 2px;
+}
+
+.md__task {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+
+.md__check {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 3px;
+  border-radius: 4px;
+  border: 1.5px solid var(--edge-bright);
+}
+
+.md__check[data-checked="true"] {
+  background: var(--good);
+  border-color: var(--good);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size: 100%;
+}
+
+.md__task > .md__li {
+  min-width: 0;
+}
+
+.md__hr {
+  border: 0;
+  border-top: 1px solid var(--edge);
+  margin: 16px 0;
+}
+
+del {
+  color: var(--text-3);
+}
+
+.md__table {
+  position: relative;
+  margin: 0 0 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.md__tablescroll {
+  overflow-x: auto;
+}
+
+.md__table table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.md__table th,
+.md__table td {
+  padding: 7px 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--edge);
+}
+
+.md__table th {
+  font-weight: 600;
+  background: var(--mat-thinner);
+  white-space: nowrap;
+}
+
+.md__table tr:last-child td {
+  border-bottom: 0;
+}
+
+.md__table tbody tr:hover td {
+  background: var(--mat-thinner);
+}
+
+.md__tablecopy {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-3);
+  background: var(--bg-2);
+  border: 1px solid var(--edge);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.md__table:hover .md__tablecopy,
+.md__tablecopy:focus-visible {
+  opacity: 1;
+}
+
+.md__math--block {
+  margin: 4px 0 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
+
+.md__math--raw {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--text-2);
+  white-space: pre-wrap;
+}
+
+.md__math .katex {
+  font-size: 1.08em;
+}
+
+.code__lines {
+  margin-right: 8px;
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.code__copy[aria-pressed="true"] {
+  color: var(--text);
+  background: var(--mat-thin);
+}
+
+.code__body--wrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

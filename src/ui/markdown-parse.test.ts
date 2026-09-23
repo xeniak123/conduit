@@ -1,109 +1,101 @@
 import { describe, expect, it } from "vitest";
-import { parse, splitInline } from "./markdown-parse";
+import type { Tokens } from "marked";
+import { decodeEntities, lex, safeHref, type MathToken, type Token } from "./markdown-parse";
 
-/**
- * A reply is whatever the model sends, which means the parser meets malformed
- * input constantly — half-written fences while a reply streams in, stray
- * asterisks, lists that stop mid-item. None of that may throw, and none of it
- * may swallow text: an answer that silently loses its second half is worse
- * than one that renders imperfectly.
- */
+const types = (tokens: Token[]) => tokens.filter((t) => t.type !== "space").map((t) => t.type);
 
-describe("blocks", () => {
-  it("reads a fenced code block with its language", () => {
-    const [block] = parse("```rust\nlet x = 1;\n```");
-    expect(block).toEqual({ kind: "code", lang: "rust", body: "let x = 1;" });
-  });
+function inlineOf(text: string): Token[] {
+  const [first] = lex(text);
+  return (first as Tokens.Paragraph).tokens;
+}
 
-  it("keeps an unterminated fence rather than dropping the rest of the reply", () => {
-    // This is the normal state of a streamed answer for a second or two.
-    const [block] = parse("```js\nconst a = 1;");
-    expect(block.kind).toBe("code");
-    expect((block as { body: string }).body).toBe("const a = 1;");
-  });
+describe("the reply reader", () => {
+  it("reads the constructs models actually answer with", () => {
+    const tokens = lex(
+      [
+        "# Title",
+        "",
+        "Some **bold** and ~~struck~~ text.",
+        "",
+        "| a | b |",
+        "|:--|--:|",
+        "| 1 | 2 |",
+        "",
+        "- [ ] to do",
+        "- [x] done",
+        "",
+        "```ts",
+        "const x = 1;",
+        "```",
+        "",
+        "---",
+      ].join("\n"),
+    );
+    expect(types(tokens)).toEqual(["heading", "paragraph", "table", "list", "code", "hr"]);
 
-  it("reads headings at every level it supports", () => {
-    expect(parse("# One")[0]).toEqual({ kind: "heading", level: 1, body: "One" });
-    expect(parse("#### Four")[0]).toEqual({ kind: "heading", level: 4, body: "Four" });
-  });
-
-  it("groups consecutive bullets into one list", () => {
-    const [block] = parse("- one\n- two\n- three");
-    expect(block).toEqual({ kind: "list", ordered: false, items: ["one", "two", "three"] });
-  });
-
-  it("recognises a numbered list as ordered", () => {
-    const [block] = parse("1. first\n2. second");
-    expect(block).toEqual({ kind: "list", ordered: true, items: ["first", "second"] });
-  });
-
-  it("joins a wrapped quote into one block", () => {
-    expect(parse("> line one\n> line two")[0]).toEqual({
-      kind: "quote",
-      body: "line one line two",
-    });
-  });
-
-  it("keeps consecutive lines together as one paragraph", () => {
-    expect(parse("one\ntwo\n\nthree")).toEqual([
-      { kind: "para", body: "one\ntwo" },
-      { kind: "para", body: "three" },
+    const table = tokens.find((t) => t.type === "table") as Tokens.Table;
+    expect(table.align).toEqual(["left", "right"]);
+    const list = tokens.find((t) => t.type === "list") as Tokens.List;
+    expect(list.items.map((i) => [i.task, i.checked])).toEqual([
+      [true, false],
+      [true, true],
     ]);
   });
 
-  it("does not run a paragraph into the block that follows it", () => {
-    const blocks = parse("Here it is:\n```\ncode\n```");
-    expect(blocks.map((b) => b.kind)).toEqual(["para", "code"]);
+  it("nests lists instead of flattening them", () => {
+    const list = lex("- one\n  - inner\n- two")[0] as Tokens.List;
+    expect(list.items).toHaveLength(2);
+    expect(list.items[0].tokens.some((t) => t.type === "list")).toBe(true);
   });
 
-  it("returns nothing for empty or whitespace-only input", () => {
-    expect(parse("")).toEqual([]);
-    expect(parse("\n\n  \n")).toEqual([]);
+  it("keeps an unfinished code fence as code while a reply is still streaming", () => {
+    const tokens = lex("Here:\n\n```python\nprint('hi')");
+    expect(types(tokens)).toEqual(["paragraph", "code"]);
+    expect((tokens.find((t) => t.type === "code") as Tokens.Code).text).toBe("print('hi')");
+  });
+
+  it("keeps single line breaks, the way people write in a chat", () => {
+    expect(inlineOf("line one\nline two").some((t) => t.type === "br")).toBe(true);
   });
 });
 
-describe("inline formatting", () => {
-  it("splits code, bold, italics and links out of the surrounding text", () => {
-    const parts = splitInline("run `npm test` for **all** of *them* — see [docs](https://x.dev)");
-    const kinds = parts.map((p) => p.type);
-    expect(kinds).toContain("code");
-    expect(kinds).toContain("bold");
-    expect(kinds).toContain("em");
-    expect(kinds).toContain("link");
-  });
-
-  it("keeps a link's text and destination apart", () => {
-    const link = splitInline("[the docs](https://example.com/a)").find((p) => p.type === "link");
-    expect(link).toEqual({ type: "link", text: "the docs", href: "https://example.com/a" });
-  });
-
-  it("loses no characters, whatever the input", () => {
-    // The property that actually matters: reassembling the parts must give
-    // back the original, so no reply can quietly lose a word.
-    for (const input of [
-      "plain text",
-      "a `b` c **d** e *f* g",
-      "unmatched ` backtick",
-      "unmatched ** bold",
-      "**bold at the start** and end *italic*",
-      "3 * 4 * 5 arithmetic",
-    ]) {
-      const rebuilt = splitInline(input)
-        .map((p) => {
-          if (p.type === "code") return `\`${p.text}\``;
-          if (p.type === "bold") return `**${p.text}**`;
-          if (p.type === "em") return `*${p.text}*`;
-          if (p.type === "link") return `[${p.text}](${p.href})`;
-          return p.text;
-        })
-        .join("");
-      expect(rebuilt, input).toBe(input);
+describe("maths", () => {
+  it("reads display maths in both spellings", () => {
+    for (const source of ["$$\n\\frac{a}{b}\n$$", "\\[\\frac{a}{b}\\]"]) {
+      const [token] = lex(source) as unknown as MathToken[];
+      expect(token.type, source).toBe("mathBlock");
+      expect(token.text).toBe("\\frac{a}{b}");
     }
   });
 
-  it("treats text with no markup as a single plain part", () => {
-    expect(splitInline("nothing special here")).toEqual([
-      { type: "text", text: "nothing special here" },
-    ]);
+  it("reads inline maths", () => {
+    const math = inlineOf("Area is $\\pi r^2$ and \\(e^x\\).").filter((t) => t.type === "mathInline") as unknown as MathToken[];
+    expect(math.map((m) => m.text)).toEqual(["\\pi r^2", "e^x"]);
+  });
+
+  it("leaves prices alone", () => {
+    const tokens = inlineOf("It costs $5 and $10 a month.");
+    expect(tokens.some((t) => t.type === "mathInline")).toBe(false);
+  });
+});
+
+describe("safety", () => {
+  it("allows only links that go somewhere safe", () => {
+    expect(safeHref("https://example.com")).toBe("https://example.com");
+    expect(safeHref("mailto:a@b.c")).toBe("mailto:a@b.c");
+    expect(safeHref("javascript:alert(1)")).toBeNull();
+    expect(safeHref(" JavaScript:alert(1)")).toBeNull();
+    expect(safeHref("file:///C:/Windows")).toBeNull();
+    expect(safeHref("data:text/html,x")).toBeNull();
+  });
+
+  it("turns raw HTML into a token the view prints as text", () => {
+    const tokens = inlineOf("before <img src=x onerror=alert(1)> after");
+    expect(tokens.some((t) => t.type === "html")).toBe(true);
+  });
+
+  it("decodes entities for display", () => {
+    expect(decodeEntities("a &amp; b &lt;c&gt; &#8212; &#x2014;")).toBe("a & b <c> \u2014 \u2014");
+    expect(decodeEntities("R&D; &unknown;")).toBe("R&D; &unknown;");
   });
 });

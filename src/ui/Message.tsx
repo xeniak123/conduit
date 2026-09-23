@@ -1,18 +1,23 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { resend } from "@/core/chat";
+import { resend, sendMessage } from "@/core/chat";
+import { saveSettings } from "@/core/config";
 import type { AgentStep } from "@/core/agent";
 import { useApp, type ChatMessage } from "@/core/store";
 import { formatCost } from "@/core/usage";
 import { Icon } from "./icons";
 import { Logo } from "./Logo";
 import { Markdown } from "./Markdown";
+import { Changes } from "./Changes";
 import { SPRING, SPRING_SNAP, riseIn } from "./motion";
 
 export function Message({ message }: { message: ChatMessage }) {
   const [editing, setEditing] = useState(false);
   const conversationId = useApp((s) => s.activeId);
   const busy = useApp((s) => s.abort !== null);
+  // Only the newest reply offers to carry out its plan; an old plan further up
+  // the chat has usually been overtaken by the conversation since.
+  const isLast = useApp((s) => s.conversations.find((c) => c.id === s.activeId)?.messages.at(-1)?.id === message.id);
   if (message.role === "user") {
     return (
       <motion.div className="msg msg--user" {...riseIn} transition={SPRING}>
@@ -81,6 +86,10 @@ export function Message({ message }: { message: ChatMessage }) {
           ) : null}
 
           {message.steps.some((st) => st.kind !== "answer" && st.kind !== "thought") && <Activity message={message} />}
+
+          <Changes messageId={message.id} busy={Boolean(message.pending)} />
+
+          {message.plan && !message.pending && isLast && !busy && <CarryOut />}
 
           {!message.pending && message.text && (
             <>
@@ -409,4 +418,29 @@ function timeline(steps: AgentStep[]): TimelineItem[] {
     }
   }
   return out;
+}
+
+/**
+ * The step from a plan to the work.
+ *
+ * Leaves Plan mode (the way Cline's Act switch does) and asks the agent to go
+ * ahead, so the plan that was read is the plan that runs.
+ */
+function CarryOut() {
+  const go = async () => {
+    const state = useApp.getState();
+    const settings = state.settings;
+    const next = { ...settings, code: { ...settings.code, plan: false } };
+    state.setSettings(next);
+    await saveSettings(next).catch(() => undefined);
+    void sendMessage("Go ahead: carry out the plan above, then check it worked.");
+  };
+  return (
+    <div className="carryout">
+      <button className="btn btn--accent" onPointerDown={() => void go()}>
+        <Icon.play /> Carry out this plan
+      </button>
+      <span className="muted">Or reply to change it first.</span>
+    </div>
+  );
 }

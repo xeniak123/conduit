@@ -8,6 +8,10 @@ import { getSettings, type Settings } from "./config";
 import { pulseCursorBirth } from "./companion";
 import { useApp } from "./store";
 import { formatCost, summarise } from "./usage";
+import { historyChars } from "./context";
+import { beginCheckpoint, endCheckpoint } from "./checkpoints";
+import { nameChat } from "./titles";
+import { useRuntime } from "@/models/runtime";
 
 /**
  * Sending a message.
@@ -46,7 +50,10 @@ export async function sendMessage(
   const picked = !opts.settings && base.router?.enabled ? await route(trimmed, base, opts.images?.length ?? 0) : null;
   const settings = picked ? { ...base, command: picked.model } : base;
   const declined: string[] = [];
-  const history = historyOf(conversationId);
+  const history = historyOf(
+    conversationId,
+    historyChars(settings.command.provider, settings.command.model, useRuntime.getState().loaded?.context),
+  );
 
   store.addMessage(conversationId, {
     id: crypto.randomUUID(),
@@ -112,6 +119,9 @@ export async function sendMessage(
     report: (line) => useApp.getState().setCaption(line),
   };
 
+  // Files the run writes are snapshotted against this reply, so it can offer
+  // to put them back.
+  beginCheckpoint(conversationId, replyId);
   const startedAt = Date.now();
   let pending = "";
   let frame: number | null = null;
@@ -157,6 +167,12 @@ export async function sendMessage(
       history,
     );
 
+    // The first exchange names the chat, after the answer is already showing.
+    const convo = useApp.getState().conversations.find((c) => c.id === conversationId);
+    if (!opts.unattended && run.answer && convo && convo.messages.length <= 2) {
+      void nameChat(conversationId, trimmed, run.answer, settings);
+    }
+
     // A run that took a while probably finished after the user looked away.
     // Anything under half a minute they were almost certainly watching, and a
     // notification for that is just noise.
@@ -172,6 +188,7 @@ export async function sendMessage(
       streaming: false,
       pending: false,
       cost: run.usage.cost,
+      plan: settings.code.enabled && settings.code.plan ? true : undefined,
       tokens: run.usage.input + run.usage.output,
       routed: picked
         ? {
@@ -193,6 +210,7 @@ export async function sendMessage(
       streaming: false,
     });
   } finally {
+    endCheckpoint(conversationId);
     // Whatever is still buffered must land before the final text is written,
     // or the last few words of a reply disappear.
     if (frame !== null) cancelAnimationFrame(frame);
@@ -222,7 +240,7 @@ export async function sendMessage(
  * little once a turn is over. Capped by characters rather than turns, since a
  * single pasted file can outweigh fifty short exchanges.
  */
-function historyOf(conversationId: string, budget = 60_000): Msg[] {
+function historyOf(conversationId: string, budget: number): Msg[] {
   const convo = useApp.getState().conversations.find((c) => c.id === conversationId);
   if (!convo) return [];
   const out: Msg[] = [];

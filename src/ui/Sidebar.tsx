@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { Conversation, Page } from "@/core/store";
 import { useApp } from "@/core/store";
@@ -66,6 +66,14 @@ export function Sidebar() {
   };
 
   const groups = useMemo(() => groupByAge(conversations, query), [conversations, query]);
+  // A deleted chat can be brought back for a few seconds: one stray click on a
+  // trash icon should never cost a conversation.
+  const [deleted, setDeleted] = useState<{ convo: Conversation; index: number } | null>(null);
+  useEffect(() => {
+    if (!deleted) return;
+    const t = window.setTimeout(() => setDeleted(null), 7000);
+    return () => window.clearTimeout(t);
+  }, [deleted]);
 
   const startChat = () => {
     // Reuse an empty chat instead of stacking up blank ones.
@@ -182,36 +190,46 @@ export function Sidebar() {
         {groups.map((group) => (
           <div key={group.label} className="nav__group">
             {groups.length > 1 && <div className="nav__sublabel">{group.label}</div>}
-            {group.items.map((convo) => {
-              const active = page === "chat" && convo.id === activeId;
-              return (
-                <button
-                  key={convo.id}
-                  className="recent"
-                  aria-current={active}
-                  onPointerDown={() => select(convo.id)}
-                >
-                  {active && (
-                    <motion.span layoutId="recent-pill" className="recent__pill" transition={SPRING} />
-                  )}
-                  <span className="recent__label">{convo.title}</span>
-                  <span
-                    className="recent__del"
-                    role="button"
-                    aria-label="Delete chat"
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      remove(convo.id);
-                    }}
-                  >
-                    <Icon.trash />
-                  </span>
-                </button>
-              );
-            })}
+            {group.items.map((convo) => (
+              <RecentRow
+                key={convo.id}
+                convo={convo}
+                active={page === "chat" && convo.id === activeId}
+                onSelect={() => select(convo.id)}
+                onDelete={() => {
+                  const index = conversations.findIndex((c) => c.id === convo.id);
+                  remove(convo.id);
+                  setDeleted({ convo, index });
+                }}
+              />
+            ))}
           </div>
         ))}
       </div>
+
+      <AnimatePresence>
+        {deleted && (
+          <motion.div
+            className="undo-toast"
+            role="status"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={SPRING_SNAP}
+          >
+            <span>Chat deleted</span>
+            <button
+              className="linkbtn"
+              onPointerDown={() => {
+                useApp.getState().restoreConversation(deleted.convo, deleted.index);
+                setDeleted(null);
+              }}
+            >
+              Undo
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="nav__foot">
         <button
@@ -279,6 +297,7 @@ function groupByAge(
 
   const now = Date.now();
   const buckets: Array<{ label: string; items: Conversation[] }> = [
+    { label: "Pinned", items: [] },
     { label: "Today", items: [] },
     { label: "Yesterday", items: [] },
     { label: "This week", items: [] },
@@ -287,11 +306,108 @@ function groupByAge(
 
   for (const convo of matching) {
     const age = now - convo.at;
-    if (age < DAY) buckets[0].items.push(convo);
-    else if (age < DAY * 2) buckets[1].items.push(convo);
-    else if (age < DAY * 7) buckets[2].items.push(convo);
-    else buckets[3].items.push(convo);
+    if (convo.pinned) buckets[0].items.push(convo);
+    else if (age < DAY) buckets[1].items.push(convo);
+    else if (age < DAY * 2) buckets[2].items.push(convo);
+    else if (age < DAY * 7) buckets[3].items.push(convo);
+    else buckets[4].items.push(convo);
   }
 
   return buckets.filter((b) => b.items.length > 0);
+}
+
+/**
+ * One chat in the sidebar.
+ *
+ * Double-click the name (or the pencil) to rename it in place; Enter keeps
+ * the new name, Escape keeps the old one. Pin and delete sit on the right and
+ * only appear on hover, so a long list stays a list of names.
+ */
+function RecentRow({
+  convo,
+  active,
+  onSelect,
+  onDelete,
+}: {
+  convo: Conversation;
+  active: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  const [renaming, setRenaming] = useState(false);
+  const [draft, setDraft] = useState(convo.title);
+  const input = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (renaming) {
+      setDraft(convo.title);
+      requestAnimationFrame(() => input.current?.select());
+    }
+  }, [renaming, convo.title]);
+
+  const commit = () => {
+    if (draft.trim() && draft.trim() !== convo.title) useApp.getState().renameConversation(convo.id, draft);
+    setRenaming(false);
+  };
+
+  if (renaming) {
+    return (
+      <div className="recent recent--editing">
+        <input
+          ref={input}
+          className="recent__input"
+          value={draft}
+          aria-label="Chat name"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") setRenaming(false);
+          }}
+        />
+      </div>
+    );
+  }
+
+  const act = (e: React.PointerEvent, run: () => void) => {
+    e.stopPropagation();
+    run();
+  };
+
+  return (
+    <button className="recent" aria-current={active} onPointerDown={onSelect} onDoubleClick={() => setRenaming(true)} title={convo.title}>
+      {active && <motion.span layoutId="recent-pill" className="recent__pill" transition={SPRING} />}
+      {convo.pinned && <span className="recent__pin" aria-label="Pinned" />}
+      <span className="recent__label">{convo.title}</span>
+      <span className="recent__acts">
+        <span
+          className="recent__del"
+          role="button"
+          aria-label={convo.pinned ? "Unpin chat" : "Pin chat"}
+          title={convo.pinned ? "Unpin" : "Pin"}
+          onPointerDown={(e) => act(e, () => useApp.getState().togglePin(convo.id))}
+        >
+          <Icon.bookmark />
+        </span>
+        <span
+          className="recent__del"
+          role="button"
+          aria-label="Rename chat"
+          title="Rename"
+          onPointerDown={(e) => act(e, () => setRenaming(true))}
+        >
+          <Icon.compose />
+        </span>
+        <span
+          className="recent__del recent__del--danger"
+          role="button"
+          aria-label="Delete chat"
+          title="Delete"
+          onPointerDown={(e) => act(e, onDelete)}
+        >
+          <Icon.trash />
+        </span>
+      </span>
+    </button>
+  );
 }

@@ -12,6 +12,8 @@ import {
   type Prompt,
 } from "@/core/prompts";
 import { useApp } from "@/core/store";
+import { formatTokens, usageOf } from "@/core/context";
+import { useRuntime } from "@/models/runtime";
 import { Icon } from "./icons";
 import { Meter } from "./Meter";
 import { PromptFields, SlashMenu } from "./SlashMenu";
@@ -291,6 +293,15 @@ export function Composer() {
             title="Work in a codebase: read first, edit narrowly, run the tests"
             onChange={(enabled) => persist(setSettings, { ...settings, code: { ...settings.code, enabled } })}
           />
+          {settings.code.enabled && (
+            <ToolToggle
+              on={Boolean(settings.code.plan)}
+              icon={<Icon.book />}
+              label="Plan"
+              title="Plan first: read and propose, change nothing until you say go"
+              onChange={(plan) => persist(setSettings, { ...settings, code: { ...settings.code, plan } })}
+            />
+          )}
           <ScreenToggle settings={settings} onChange={(next) => persist(setSettings, next)} />
 
           {settings.activeProjectId && (
@@ -301,6 +312,8 @@ export function Composer() {
           )}
 
           <span className="spacer" />
+
+          <ContextMeter />
 
           {listening ? (
             <span className="mic mic--live" aria-label="Listening">
@@ -512,7 +525,7 @@ function ApprovalMenu({ settings, onChange }: { settings: Settings; onChange: (s
         onPointerDown={() => setOpen(!open)}
       >
         <Icon.shield />
-        {APPROVAL[profile]}
+        <span className="ctool__label">{APPROVAL[profile]}</span>
         <span className="ctool__caret">
           <Icon.chevron />
         </span>
@@ -562,13 +575,14 @@ function ToolToggle({
     <motion.button
       className="ctool"
       aria-pressed={on}
+      aria-label={label}
       title={title}
       onPointerDown={() => onChange(!on)}
       whileTap={{ scale: 0.95 }}
       transition={SPRING_SNAP}
     >
       {icon}
-      {label}
+      <span className="ctool__label">{label}</span>
     </motion.button>
   );
 }
@@ -596,7 +610,7 @@ function ScreenToggle({ settings, onChange }: { settings: Settings; onChange: (s
         onPointerDown={() => (cu.enabled ? set({ enabled: false }) : setOpen(!open))}
       >
         <Icon.display />
-        Screen
+        <span className="ctool__label">Screen</span>
       </motion.button>
       <AnimatePresence>
         {open && (
@@ -640,5 +654,50 @@ function CodeGlyph() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M8 7l-5 5 5 5M16 7l5 5-5 5" />
     </svg>
+  );
+}
+
+/**
+ * How much of the conversation the next message carries.
+ *
+ * A ring rather than a number: it only needs to say "plenty of room" or "the
+ * start of this chat is no longer being sent", and the tooltip has the rest.
+ * Nothing shows on an empty chat.
+ */
+function ContextMeter() {
+  const activeId = useApp((s) => s.activeId);
+  const messages = useApp((s) => s.conversations.find((c) => c.id === s.activeId)?.messages);
+  const command = useApp((s) => s.settings.command);
+  const localContext = useRuntime((s) => s.loaded?.context);
+
+  const usage = useMemo(
+    () => (messages?.length ? usageOf(messages, command.provider, command.model, localContext) : null),
+    [messages, command.provider, command.model, localContext],
+  );
+  if (!activeId || !usage || usage.sent === 0) return null;
+
+  const share = Math.min(1, usage.sent / usage.budget);
+  const full = usage.dropped > 0;
+  const r = 7;
+  const circumference = 2 * Math.PI * r;
+  const title = full
+    ? `The ${usage.dropped} earliest message${usage.dropped === 1 ? " is" : "s are"} no longer sent to the model. Start a new chat, or ask it to summarise so far.`
+    : `${formatTokens(usage.sent)} of ${formatTokens(usage.budget)} tokens of this chat are sent with each message (the model's window is ${formatTokens(usage.window)}).`;
+
+  return (
+    <span className="ctxmeter" data-full={full} title={title} aria-label={title} role="img">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+        <circle cx="9" cy="9" r={r} className="ctxmeter__track" />
+        <circle
+          cx="9"
+          cy="9"
+          r={r}
+          className="ctxmeter__fill"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - share)}
+        />
+      </svg>
+      <span className="ctxmeter__text">{formatTokens(usage.sent)}</span>
+    </span>
   );
 }

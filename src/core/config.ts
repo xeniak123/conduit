@@ -289,6 +289,11 @@ export interface Settings {
     guardDirtyFiles: boolean;
     /** Run the project's test command after an edit and report the result. */
     testCommand: string;
+    /**
+     * Plan first: the agent may read and search but not change anything, and
+     * answers with a plan the user carries out with one click.
+     */
+    plan?: boolean;
   };
 
   mcp: { servers: McpServer[] };

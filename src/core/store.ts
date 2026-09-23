@@ -36,6 +36,8 @@ export interface ChatMessage {
   version?: number;
   /** Which model the router picked for this reply, and why. */
   routed?: { model: string; tier: "fast" | "strong"; reason: string; saved: number | null };
+  /** Written in Plan mode: a proposal the user can carry out with one click. */
+  plan?: boolean;
 }
 
 export interface Conversation {
@@ -47,6 +49,10 @@ export interface Conversation {
   projectId?: string;
   /** Set when a scheduled task produced this chat. */
   scheduleId?: string;
+  /** Kept at the top of the sidebar, above the dated groups. */
+  pinned?: boolean;
+  /** The user named it; automatic titles no longer replace the name. */
+  named?: boolean;
 }
 
 export interface PendingApproval {
@@ -77,6 +83,10 @@ interface AppState {
   ensureConversation: () => string;
   selectConversation: (id: string) => void;
   deleteConversation: (id: string) => void;
+  renameConversation: (id: string, title: string) => void;
+  togglePin: (id: string) => void;
+  /** Puts back a chat that was just deleted, where it was. */
+  restoreConversation: (conversation: Conversation, index: number) => void;
   addMessage: (conversationId: string, message: ChatMessage) => void;
   patchMessage: (conversationId: string, messageId: string, patch: Partial<ChatMessage>) => void;
   appendStep: (conversationId: string, messageId: string, step: AgentStep) => void;
@@ -157,6 +167,22 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   selectConversation: (id) => set({ activeId: id, page: "chat" }),
+
+  renameConversation: (id, title) =>
+    set((s) => ({
+      conversations: s.conversations.map((c) => (c.id === id ? { ...c, title: title.trim() || c.title, named: true } : c)),
+    })),
+
+  togglePin: (id) =>
+    set((s) => ({ conversations: s.conversations.map((c) => (c.id === id ? { ...c, pinned: !c.pinned } : c)) })),
+
+  restoreConversation: (conversation, index) =>
+    set((s) => {
+      if (s.conversations.some((c) => c.id === conversation.id)) return {};
+      const conversations = [...s.conversations];
+      conversations.splice(Math.min(index, conversations.length), 0, conversation);
+      return { conversations };
+    }),
 
   deleteConversation: (id) =>
     set((s) => {

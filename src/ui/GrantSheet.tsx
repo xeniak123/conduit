@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AnimatePresence, motion } from "motion/react";
 import { createToken } from "@/api/server";
+import { isTauri } from "@/core/host";
 import { Icon } from "./icons";
 import { SPRING, materialize } from "./motion";
 
@@ -31,6 +32,7 @@ export function GrantSheet() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (!isTauri()) return;
     const stop = listen<Request>("conduit://oauth-request", (event) => setRequest(event.payload));
     return () => void stop.then((un) => un());
   }, []);

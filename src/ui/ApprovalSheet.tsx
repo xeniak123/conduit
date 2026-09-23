@@ -48,7 +48,19 @@ export function ApprovalSheet() {
           >
             <div className="confirm__head">Run this?</div>
             <pre className="confirm__cmd">{approval.summary}</pre>
-            {approval.detail && <div className="confirm__detail">{approval.detail}</div>}
+            {approval.detail &&
+              (isDiff(approval.detail) ? (
+                <pre className="confirm__diff">
+                  {approval.detail.split("\n").map((line, i) => (
+                    <span key={i} data-kind={line.startsWith("+ ") ? "add" : line.startsWith("- ") ? "del" : "same"}>
+                      {line}
+                      {"\n"}
+                    </span>
+                  ))}
+                </pre>
+              ) : (
+                <div className="confirm__detail">{approval.detail}</div>
+              ))}
             <div className="confirm__actions">
               <button className="btn" onPointerDown={() => resolve(false)}>
                 Cancel
@@ -62,4 +74,10 @@ export function ApprovalSheet() {
       )}
     </AnimatePresence>
   );
+}
+
+/** A code edit's preview arrives as "- old" and "+ new" lines. */
+function isDiff(detail: string): boolean {
+  const lines = detail.split("\n");
+  return lines.length > 1 && lines.every((l) => l.startsWith("- ") || l.startsWith("+ "));
 }
