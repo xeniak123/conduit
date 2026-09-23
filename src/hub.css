@@ -6425,7 +6425,7 @@ button.backend:active:not(:disabled) {
 }
 
 .changes__toggle[aria-expanded="true"] .changes__chev svg {
-  transform: rotate(180deg);
+  transform: rotate(90deg);
 }
 
 .changes__confirm {
@@ -6713,4 +6713,5 @@ button.backend:active:not(:disabled) {
 .jumpdown svg {
   width: 15px;
   height: 15px;
+  transform: rotate(90deg);
 }

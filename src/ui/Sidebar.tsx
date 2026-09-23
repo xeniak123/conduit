@@ -14,6 +14,7 @@ import { SPRING, SPRING_SNAP } from "./motion";
 const NAV: Array<{ page: Page; label: string; icon: keyof typeof Icon }> = [
   { page: "models", label: "Model hub", icon: "grid" },
   { page: "arena", label: "Arena", icon: "chart" },
+  { page: "tune", label: "Train", icon: "brain" },
   { page: "projects", label: "Projects", icon: "folder" },
 ];
 
@@ -22,7 +23,6 @@ const MORE: Array<{ page: Page; label: string; icon: keyof typeof Icon }> = [
   { page: "scheduled", label: "Scheduled", icon: "clock" },
   { page: "agents", label: "Agents", icon: "terminal" },
   { page: "decide", label: "Decisions", icon: "bolt" },
-  { page: "tune", label: "Fine-tune", icon: "brain" },
   { page: "store", label: "Store", icon: "store" },
   { page: "companion", label: "Companion", icon: "sparkle" },
   { page: "api", label: "API", icon: "globe" },

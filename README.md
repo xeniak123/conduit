@@ -20,7 +20,7 @@ No account needed.
 | --- | --- |
 | ChatGPT, Claude | Chat with memory, projects, file and image attachments, tables, maths (LaTeX), live HTML previews, branching, pinned and renamed chats, and a meter for how much of the conversation the model sees. Import your old chats from ChatGPT and Claude exports. |
 | Cline, Cursor's agent | **Code mode**: the agent reads, searches, edits and runs your tests. **Plan** first and nothing changes until you say go; every edit is approved as a diff; every reply that changed files can be reviewed and undone in one click. |
-| Colab notebooks for fine-tuning | **Fine-tune**: training data from Hugging Face, a file or your own chats; LoRA, QLoRA or full; a memory check against your GPU; a plain script you can read. |
+| Unsloth Studio, Colab notebooks | **Train**: pick a model and a dataset from Hugging Face, a file or your own chats; QLoRA, LoRA, full fine-tuning or continued pretraining; a memory check against your GPU; start it and watch the loss curve and log live, stop it, and find every run again in History. The script is plain transformers + peft + trl you can read and keep. |
 | OpenRouter and every provider's console | One switcher with every model your keys unlock: Anthropic, OpenAI, Gemini, OpenRouter, Hugging Face, Groq, DeepSeek, Mistral, xAI and more. |
 | LM Studio, Ollama | **Model hub**: search Hugging Face, pick a quantization, see whether it fits your GPU before downloading, load it with one click. |
 | Unsloth start, manual env vars | **Agents**: open Claude Code, Codex, OpenCode, Aider or Goose on any model in Conduit, including a local one, without touching their config. |

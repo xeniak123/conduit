@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULTS, conversionSteps, estimate, parametersFromName, problems, trainingScript } from "./tune";
+import {
+  DEFAULTS,
+  conversionSteps,
+  estimate,
+  family,
+  fromYaml,
+  parametersFromName,
+  parseProgress,
+  problems,
+  toYaml,
+  trainingScript,
+} from "./tune";
 
 describe("reading a size out of a model name", () => {
   it("reads the usual spellings", () => {
@@ -56,7 +67,7 @@ describe("the generated script", () => {
   });
 
   it("carries the hyperparameters that were chosen", () => {
-    const script = trainingScript({ ...config, epochs: 5, rank: 64, alpha: 128 });
+    const script = trainingScript({ ...config, useEpochs: true, epochs: 5, rank: 64, alpha: 128 });
     expect(script).toContain("num_train_epochs=5");
     expect(script).toContain("r=64");
     expect(script).toContain("lora_alpha=128");
@@ -78,7 +89,7 @@ describe("what comes after training", () => {
 
 describe("catching a plan that will waste an afternoon", () => {
   it("names what is missing", () => {
-    expect(problems(DEFAULTS)).toContain("Pick a dataset file.");
+    expect(problems(DEFAULTS)).toContain("Pick a dataset.");
   });
 
   it("stops a full fine-tune at an adapter's learning rate", () => {
@@ -88,5 +99,97 @@ describe("catching a plan that will waste an afternoon", () => {
 
   it("is quiet about a sound plan", () => {
     expect(problems({ ...DEFAULTS, dataset: "d.jsonl", output: "out" })).toEqual([]);
+  });
+});
+
+describe("steps, raw text and evaluation", () => {
+  const config = { ...DEFAULTS, dataset: "d.jsonl", output: "out" };
+
+  it("trains for steps by default and for epochs when asked", () => {
+    expect(trainingScript(config)).toContain(`max_steps=${DEFAULTS.maxSteps}`);
+    expect(trainingScript({ ...config, useEpochs: true, epochs: 2 })).toContain("num_train_epochs=2");
+  });
+
+  it("trains continued pretraining on raw text, embeddings included", () => {
+    const script = trainingScript({ ...config, method: "cpt" });
+    expect(script).toContain('dataset_text_field="text"');
+    expect(script).toContain("embed_tokens");
+    expect(script).not.toContain("load_in_4bit");
+  });
+
+  it("scores an evaluation file only when there is one", () => {
+    expect(trainingScript(config)).not.toContain("eval_strategy");
+    expect(trainingScript({ ...config, evalDataset: "e.jsonl" })).toContain('eval_strategy="steps"');
+  });
+
+  it("names the family above the model", () => {
+    expect(family("Qwen/Qwen2.5-Coder-7B-Instruct")).toBe("QWEN");
+    expect(family("meta-llama/Llama-3.2-3B")).toBe("LLAMA");
+  });
+});
+
+describe("following a run", () => {
+  it("reads the script's progress lines and ignores the rest", () => {
+    expect(parseProgress('CONDUIT {"step": 12, "max_steps": 60, "loss": 1.25, "learning_rate": 0.0002, "epoch": 0.4}')).toEqual({
+      step: 12,
+      maxSteps: 60,
+      loss: 1.25,
+      evalLoss: undefined,
+      learningRate: 0.0002,
+      epoch: 0.4,
+      done: undefined,
+    });
+    expect(parseProgress('CONDUIT {"done": true, "output": "x"}')?.done).toBe(true);
+    expect(parseProgress(" 20%|##        | 12/60 [00:10<00:40]")).toBeNull();
+    expect(parseProgress("CONDUIT not json")).toBeNull();
+  });
+});
+
+describe("configurations as YAML", () => {
+  it("round-trips every setting", () => {
+    const config = { ...DEFAULTS, name: 'my "run"', model: "C:\\models\\qwen", method: "cpt" as const, useEpochs: true, epochs: 3, learningRate: 5e-5 };
+    expect(fromYaml(toYaml(config))).toEqual(config);
+  });
+
+  it("ignores unknown keys and bad values instead of breaking", () => {
+    const loaded = fromYaml("method: magic\nmax_steps: lots\nunknown: 1\nrank: 32");
+    expect(loaded.method).toBe(DEFAULTS.method);
+    expect(loaded.maxSteps).toBe(DEFAULTS.maxSteps);
+    expect(loaded.rank).toBe(32);
+  });
+});
+
+describe("a Hugging Face dataset read by the script", () => {
+  const hub = {
+    ...DEFAULTS,
+    output: "out",
+    hubDataset: "tatsu-lab/alpaca",
+    hubSplit: "train",
+    mapPrompt: "instruction",
+    mapResponse: "output",
+    mapContext: "input",
+  };
+
+  it("loads it with load_dataset and the chosen columns", () => {
+    const script = trainingScript(hub);
+    expect(script).toContain('HUB = "tatsu-lab/alpaca"');
+    expect(script).toContain("load_dataset(HUB, SUBSET, split=split, token=TOKEN)");
+    expect(script).toContain('CONTEXT = "input"');
+    expect(script).not.toContain("DATA = ");
+    expect(problems(hub)).toEqual([]);
+  });
+
+  it("asks for the columns it cannot guess", () => {
+    expect(problems({ ...hub, mapPrompt: "" })).toContain("Say which column holds the question.");
+    expect(problems({ ...hub, mapResponse: "" })).toContain("Say which column holds the answer.");
+    expect(problems({ ...hub, mapPrompt: "messages", mapResponse: "" })).toEqual([]);
+  });
+
+  it("evaluates on a second split when one is chosen", () => {
+    expect(trainingScript({ ...hub, hubEvalSplit: "test" })).toContain('eval_strategy="steps"');
+  });
+
+  it("keeps the source in a saved configuration", () => {
+    expect(fromYaml(toYaml(hub))).toEqual(hub);
   });
 });

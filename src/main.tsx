@@ -11,6 +11,7 @@ import "./quick.css";
 import "./companion.css";
 import "./extend.css";
 import "./hub.css";
+import "./train.css";
 import { useApp } from "./core/store";
 
 // Development only: a handle on the store from the devtools console. Debugging

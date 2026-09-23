@@ -94,7 +94,7 @@ export function CommandPalette() {
     const pages: Array<[Page, string, keyof typeof Icon]> = [
       ["models", "Model hub", "grid"],
       ["arena", "Arena", "chart"],
-      ["tune", "Fine-tune", "brain"],
+      ["tune", "Train", "brain"],
       ["projects", "Projects", "folder"],
       ["scheduled", "Scheduled", "clock"],
       ["agents", "Agents", "terminal"],

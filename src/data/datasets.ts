@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isTauri } from "@/core/host";
 import { hfAuth } from "@/models/hub";
+import { chunkText } from "./sources";
 
 /**
  * Datasets: the other half of running your own models.
@@ -53,7 +54,7 @@ export interface ColumnMapping {
   context?: string;
 }
 
-async function getJson<T>(url: string, auth = false): Promise<T> {
+export async function getJson<T>(url: string, auth = false): Promise<T> {
   if (!isTauri()) {
     const res = await fetch(url, { headers: { accept: "application/json" } });
     if (!res.ok) throw new Error(`Hugging Face answered ${res.status}.`);
@@ -205,7 +206,7 @@ export interface ChatTurn {
   content: string;
 }
 
-function asText(value: unknown): string {
+export function asText(value: unknown): string {
   if (typeof value === "string") return value;
   if (value === null || value === undefined) return "";
   return JSON.stringify(value);
@@ -268,6 +269,10 @@ export function toChatJsonl(rows: Array<Record<string, unknown>>, mapping: Colum
 export function parseLocalDataset(text: string, filename: string): DatasetRows {
   const name = filename.toLowerCase();
   if (name.endsWith(".csv") || name.endsWith(".tsv")) return parseSeparated(text, name.endsWith(".tsv") ? "\t" : ",");
+  if (name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".markdown")) {
+    const rows = chunkText(text).map((chunk) => ({ text: chunk }));
+    return { columns: ["text"], rows, total: rows.length };
+  }
 
   const trimmed = text.trim();
   const rows: Array<Record<string, unknown>> = [];
